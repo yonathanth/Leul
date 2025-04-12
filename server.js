@@ -15,7 +15,7 @@ app.use(express.urlencoded({ extended: false }));
 // CORS configuration
 const corsOptions = {
   origin: "localhost:3000",
-  methods: ["GET", "POST", "PATCH", "PUT", "DELETE"], // Specify allowed methods if needed
+  methods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
   optionsSuccessStatus: 200,
 };
 

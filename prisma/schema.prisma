@@ -1,52 +1,216 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-
-model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  name      String?
-  password  String
-  phone     String?
-  address   String?
-  role      Role     @default(USER)
-  bookings  Order[]  @relation("UserBookings")
-  Service Service[] @relation("ProvidedServices")
+enum UserRole {
+  ADMIN
+  EVENT_PLANNER
+  VENDOR
+  CLIENT
 }
 
-enum Role {
-  ADMIN
-  PLANNER
-  VENDOR
-  USER
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum VendorStatus {
+  PENDING_APPROVAL
+  APPROVED
+  SUSPENDED
+}
+
+model User {
+  id            String      @id @default(uuid())
+  email         String      @unique
+  password      String
+  firstName     String
+  lastName      String
+  phone         String?
+  avatar        String?
+  role          UserRole
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Relationships
+  clientProfile     Client?
+  vendorProfile     Vendor?
+  eventPlannerProfile EventPlanner?
+  feedbackGiven     Feedback[] @relation("FeedbackFromUser")
+  feedbackReceived  Feedback[] @relation("FeedbackToUser")
+  messagesSent      Message[] @relation("MessageFromUser")
+  messagesReceived  Message[] @relation("MessageToUser")
+  paymentsMade      Payment[] @relation("PaymentsMade")
+  paymentsReceived  Payment[] @relation("PaymentsReceived")
+}
+
+model Client {
+  id          String     @id @default(uuid())
+  userId      String     @unique
+  user        User       @relation(fields: [userId], references: [id])
+  bookings    Booking[]
+  feedbacks   Feedback[] @relation("ClientFeedbacks")
+  payments    Payment[]  @relation("ClientPayments")
+}
+
+model EventPlanner {
+  id          String     @id @default(uuid())
+  userId      String     @unique
+  user        User       @relation(fields: [userId], references: [id])
+  companyName String?
+  bio         String?
+  bookings    Booking[]  @relation("EventPlannerBookings")
+  assignedVendors AssignedVendor[] @relation("EventPlannerAssignments")
+  messages    Message[]  @relation("EventPlannerMessages")
+  payments    Payment[]  @relation("EventPlannerPayments")
+}
+
+model Vendor {
+  id           String     @id @default(uuid())
+  userId       String     @unique
+  user         User       @relation(fields: [userId], references: [id])
+  businessName String
+  description  String?
+  serviceType  String
+  status       VendorStatus @default(PENDING_APPROVAL)
+  rating       Float?     @default(0)
+  services     Service[]
+  availability Availability[]
+  assignments  AssignedVendor[] @relation("VendorAssignments")
+  payments     Payment[]  @relation("VendorPayments")
+  feedbacks    Feedback[] @relation("VendorFeedbacks")
 }
 
 model Service {
-  id          Int      @id @default(autoincrement())
+  id          String     @id @default(uuid())
   name        String
-  description String?
-  provider    User     @relation("ProvidedServices", fields: [providerId], references: [id])
-  providerId  Int
-  orders      Order[]
+  description String
+  price       Float
+  category    String
+  vendorId    String
+  vendor      Vendor     @relation(fields: [vendorId], references: [id])
+  bookings    Booking[]  @relation("ServiceBookings")
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 }
 
-model Order {
-  id          Int      @id @default(autoincrement())
-  user        User     @relation("UserBookings", fields: [userId], references: [id])
-  userId      Int
-  service     Service  @relation(fields: [serviceId], references: [id])
-  serviceId   Int
-  paymentStatus String?
-  }
+model Booking {
+  id           String       @id @default(uuid())
+  clientId     String
+  client       Client       @relation(fields: [clientId], references: [id])
+  serviceId    String
+  service      Service      @relation(fields: [serviceId], references: [id], name: "ServiceBookings")
+  eventPlannerId String?
+  eventPlanner EventPlanner? @relation(fields: [eventPlannerId], references: [id], name: "EventPlannerBookings")
+  eventDate    DateTime
+  location     String
+  attendees    Int?
+  specialRequests String?
+  status       BookingStatus @default(PENDING)
+  assignments  AssignedVendor[] @relation("BookingAssignments")
+  payments     Payment[]     @relation("BookingPayments")
+  feedback     Feedback[]    @relation("BookingFeedback")
+  messages     Message[]     @relation("BookingMessages")
+  createdAt    DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model AssignedVendor {
+  id          String     @id @default(uuid())
+  bookingId   String
+  booking     Booking    @relation(fields: [bookingId], references: [id], name: "BookingAssignments")
+  vendorId    String
+  vendor      Vendor     @relation(fields: [vendorId], references: [id], name: "VendorAssignments")
+  eventPlannerId String
+  eventPlanner EventPlanner @relation(fields: [eventPlannerId], references: [id], name: "EventPlannerAssignments")
+  status      BookingStatus @default(PENDING)
+  price       Float
+  notes       String?
+  payment     Payment[]  @relation("AssignmentPayment")
+  confirmedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Availability {
+  id          String     @id @default(uuid())
+  vendorId    String
+  vendor      Vendor     @relation(fields: [vendorId], references: [id])
+  date        DateTime
+  isAvailable Boolean    @default(true)
+  reason      String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Payment {
+  id          String       @id @default(uuid())
+  amount      Float
+  status      PaymentStatus @default(PENDING)
+  method      String
+  transactionId String?
+  bookingId   String?
+  booking     Booking?     @relation(fields: [bookingId], references: [id], name: "BookingPayments")
+  assignmentId String?
+  assignment  AssignedVendor? @relation(fields: [assignmentId], references: [id], name: "AssignmentPayment")
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], name: "PaymentsMade")
+  recipientId String
+  recipient   User         @relation(fields: [recipientId], references: [id], name: "PaymentsReceived")
+  clientId    String?
+  client      Client?      @relation(fields: [clientId], references: [id], name: "ClientPayments")
+  vendorId    String?
+  vendor      Vendor?      @relation(fields: [vendorId], references: [id], name: "VendorPayments")
+  eventPlannerId String?
+  eventPlanner EventPlanner? @relation(fields: [eventPlannerId], references: [id], name: "EventPlannerPayments")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Feedback {
+  id          String     @id @default(uuid())
+  rating      Int
+  comment     String?
+  bookingId   String
+  booking     Booking    @relation(fields: [bookingId], references: [id], name: "BookingFeedback")
+  fromUserId  String
+  fromUser    User       @relation(fields: [fromUserId], references: [id], name: "FeedbackFromUser")
+  toUserId    String
+  toUser      User       @relation(fields: [toUserId], references: [id], name: "FeedbackToUser")
+  vendorId    String?
+  vendor      Vendor?    @relation(fields: [vendorId], references: [id], name: "VendorFeedbacks")
+  clientId    String?
+  client      Client?    @relation(fields: [clientId], references: [id], name: "ClientFeedbacks")
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Message {
+  id          String     @id @default(uuid())
+  content     String
+  fromUserId  String
+  fromUser    User       @relation(fields: [fromUserId], references: [id], name: "MessageFromUser")
+  toUserId    String
+  toUser      User       @relation(fields: [toUserId], references: [id], name: "MessageToUser")
+  bookingId   String?
+  booking     Booking?   @relation(fields: [bookingId], references: [id], name: "BookingMessages")
+  eventPlannerId String?
+  eventPlanner EventPlanner? @relation(fields: [eventPlannerId], references: [id], name: "EventPlannerMessages")
+  read        Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}

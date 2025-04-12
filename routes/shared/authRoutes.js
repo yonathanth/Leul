@@ -1,5 +1,5 @@
 const express = require("express");
-const { register, login } = require("../controllers/authController"); // Ensure this is the correct path
+const { register, login } = require("../../controllers/shared/authController"); // Ensure this is the correct path
 const router = express.Router();
 const checkRole = require("../middleware/checkRole");
 // Register and login routes
