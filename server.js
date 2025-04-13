@@ -25,6 +25,8 @@ app.use("/public", express.static("public"));
 // Routes
 app.use("/api/auth", require("./routes/shared/authRoutes"));
 
+//vendor Route
+app.use("/api/vendor", require("./routes/vendor/vendor"));
 // Admin Routes
 app.use("/api/admin/clients", require("./routes/admin/clientRoutes"));
 app.use("/api/admin/dashboard", require("./routes/admin/dashboardRoutes"));
