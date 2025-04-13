@@ -24,6 +24,8 @@ app.use("/public", express.static("public"));
 
 app.use("/api/auth", require("./routes/shared/authRoutes"));
 
+app.use("/api/vendor", require("./routes/vendor/vendor"));
+
 app.get("/", (req, res) => {
   res.send("Api Up and Running!");
 });
