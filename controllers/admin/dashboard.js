@@ -4,11 +4,11 @@ const prisma = require("../../../prisma/client");
 
 // Overview stats for Admin dashboard
 const getOverview = asyncHandler(async (req, res) => {
-  const totalUsers = await prisma.user.count({
-    where: { role: "CLIENT" },
+  const totalUsers = await prisma.user.count({ where: { role: "CLIENT" } });
+  const totalVendors = await prisma.user.count({ where: { role: "VENDOR" } });
+  const totalEventPlanners = await prisma.user.count({
+    where: { role: "EVENT_PLANER" },
   });
-  const totalVendors = await prisma.vendor.count();
-  const totalEventPlanners = await prisma.eventPlanner.count();
   const activeBookings = await prisma.booking.count({
     where: { status: { in: ["PENDING", "CONFIRMED"] } },
   });
