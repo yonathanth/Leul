@@ -1,4 +1,5 @@
 const asyncHandler = require("express-async-handler");
+const jwt = require("jsonwebtoken");
 
 const checkRole = (allowedRoles) => {
   return asyncHandler(async (req, res, next) => {
