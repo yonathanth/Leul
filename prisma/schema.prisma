@@ -45,6 +45,8 @@ model User {
   role          UserRole
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+  isBlocked  Boolean   @default(false) // Add for blocking users
+  isReported Boolean   @default(false)
 
   // Relationships
   clientProfile     Client?

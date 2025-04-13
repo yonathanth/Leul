@@ -22,9 +22,25 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use("/public", express.static("public"));
 
+// Routes
 app.use("/api/auth", require("./routes/shared/authRoutes"));
 
+//vendor Route
 app.use("/api/vendor", require("./routes/vendor/vendor"));
+// Admin Routes
+app.use("/api/admin/clients", require("./routes/admin/clientRoutes"));
+app.use("/api/admin/dashboard", require("./routes/admin/dashboardRoutes"));
+app.use(
+  "/api/admin/event-planners",
+  require("./routes/admin/eventPlannerRoutes")
+);
+app.use("/api/admin/feedback", require("./routes/admin/feedbackRoutes"));
+app.use("/api/admin/vendors", require("./routes/admin/vendorRoutes"));
+
+// Client Routes
+app.use("/api/client/bookings", require("./routes/client/bookingRoutes"));
+app.use("/api/client/feedback", require("./routes/client/feedbackRoutes"));
+app.use("/api/client/services", require("./routes/client/servicesRoutes"));
 
 app.get("/", (req, res) => {
   res.send("Api Up and Running!");
