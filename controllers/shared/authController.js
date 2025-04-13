@@ -3,7 +3,7 @@ const prisma = require("../../prisma/client");
 const jwt = require("jsonwebtoken");
 
 // Allowed user roles
-const ALLOWED_ROLES = ["admin", "user", "vendor", "planner"];
+const ALLOWED_ROLES = ["ADMIN", "EVENT_PLANNER", "VENDOR", "CLIENT"];
 
 // Generate a JWT token
 const generateToken = (id, role) => {
@@ -16,32 +16,41 @@ const generateToken = (id, role) => {
 const register = async (req, res) => {
   try {
     const {
-      userName,
+      email,
       password,
-      role = "user", // Default to 'user' if not provided
+      firstName,
+      lastName,
+      role = "CLIENT", // Default to 'CLIENT' if not provided
+      phone,
+      avatar,
+      businessName, // For vendors
+      serviceType, // For vendors
+      companyName, // For event planners
+      bio,
     } = req.body;
 
     // Check for required fields
-    if (!userName || !password) {
-      return res
-        .status(400)
-        .json({ error: "Username and password are required." });
+    if (!email || !password || !firstName || !lastName) {
+      return res.status(400).json({
+        error: "Email, password, first name, and last name are required.",
+      });
     }
 
     // Validate role
     if (!ALLOWED_ROLES.includes(role)) {
       return res.status(400).json({
-        error: "Invalid role. Allowed roles are: admin, user, vendor, planner",
+        error:
+          "Invalid role. Allowed roles are: ADMIN, EVENT_PLANNER, VENDOR, CLIENT",
       });
     }
 
-    // Check if username already exists
+    // Check if email already exists
     const userExists = await prisma.user.findUnique({
-      where: { userName },
+      where: { email },
     });
 
     if (userExists) {
-      return res.status(400).json({ error: "Username is already taken." });
+      return res.status(400).json({ error: "Email is already taken." });
     }
 
     // Hash the password
@@ -50,43 +59,69 @@ const register = async (req, res) => {
     // Create the new user
     const newUser = await prisma.user.create({
       data: {
-        userName,
+        email,
         password: hashedPassword,
-        role: role, // Use the provided role (or default to 'user')
+        firstName,
+        lastName,
+        role,
+        phone: phone || null,
+        avatar: avatar || null,
       },
     });
+    if (role === "CLIENT") {
+      await prisma.client.create({ data: { userId: newUser.id } });
+    } else if (role === "VENDOR") {
+      await prisma.vendor.create({
+        data: {
+          userId: newUser.id,
+          businessName: businessName || "Unnamed Business",
+          serviceType: serviceType || "General",
+        },
+      });
+    } else if (role === "EVENT_PLANNER") {
+      await prisma.eventPlanner.create({
+        data: {
+          userId: newUser.id,
+          companyName: companyName || null,
+          bio: bio || null,
+        },
+      });
+    }
+
+    const token = generateToken(newUser.id, newUser.role);
 
     return res.status(201).json({
       message: "User registered successfully.",
       user: {
         id: newUser.id,
-        userName: newUser.userName,
+        email: newUser.email,
         role: newUser.role,
       },
+      token,
     });
   } catch (error) {
-    console.error("Error in user register function:", error);
-    return res.status(500).json({ error: "Internal server error." });
+    console.error("Error in user register function:", error.message);
+    return res
+      .status(500)
+      .json({ error: "Internal server error.", details: error.message });
   }
 };
 
 // Login existing user
 const login = async (req, res) => {
   try {
-    const { userName, password } = req.body;
+    const { email, password } = req.body;
 
     // Validate input
-    if (!userName || !password) {
+    if (!email || !password) {
       return res
         .status(400)
-        .json({ error: "Username and password are required." });
+        .json({ error: "Email and password are required." });
     }
 
-    // Find user by username
+    // Find user by email
     const user = await prisma.user.findUnique({
-      where: {
-        userName: userName,
-      },
+      where: { email },
     });
 
     if (!user) {
@@ -107,13 +142,15 @@ const login = async (req, res) => {
       token,
       user: {
         id: user.id,
-        userName: user.userName,
+        email: user.email,
         role: user.role,
       },
     });
   } catch (error) {
-    console.error("Error in user login function:", error);
-    return res.status(500).json({ error: "Internal server error." });
+    console.error("Error in user login function:", error.message);
+    return res
+      .status(500)
+      .json({ error: "Internal server error.", details: error.message });
   }
 };
 

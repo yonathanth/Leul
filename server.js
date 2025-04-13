@@ -22,7 +22,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use("/public", express.static("public"));
 
-app.use("/api/auth", authRoutes);
+app.use("/api/auth", require("./routes/shared/authRoutes"));
 
 app.get("/", (req, res) => {
   res.send("Api Up and Running!");
