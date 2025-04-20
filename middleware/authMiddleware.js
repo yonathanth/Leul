@@ -22,7 +22,7 @@ const checkRole = (allowedRoles) => {
       };
 
       // Check if user has one of the allowed roles
-      if (!allowedRoles.includes(decoded.role)) {
+      if (!allowedRoles.includes(decoded(token).role)) {
         return res.status(403).json({
           message: `Access denied. Requires one of these roles: ${allowedRoles.join(
             ", "
@@ -31,7 +31,7 @@ const checkRole = (allowedRoles) => {
       }
 
       // Attach user to request object
-      req.user = decoded;
+      req.user = decoded(token);
       next();
     } catch (error) {
       console.error("Error in role check middleware:", error);

@@ -40,6 +40,59 @@ const approveVendor = asyncHandler(async (req, res) => {
   });
 });
 
+const deleteVendor = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  // Check if vendor exists
+  const vendor = await prisma.vendor.findUnique({ where: { id } });
+  if (!vendor) {
+    res.status(404);
+    throw new Error("Vendor not found");
+  }
+
+  // Delete associated user (this will cascade to vendor due to schema relations)
+  await prisma.user.delete({ where: { id: vendor.userId } });
+
+  res.status(200).json({ message: "Vendor removed successfully" });
+});
+
+const editVendor = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { businessName, serviceType, status } = req.body;
+
+  // Check if vendor exists
+  const vendor = await prisma.vendor.findUnique({ where: { id } });
+  if (!vendor) {
+    res.status(404);
+    throw new Error("Vendor not found");
+  }
+
+  // Update vendor details
+  const updatedVendor = await prisma.vendor.update({
+    where: { id },
+    data: {
+      businessName,
+      serviceType,
+      status,
+    },
+    include: {
+      user: { select: { email: true, firstName: true, lastName: true } },
+    },
+  });
+
+  res.status(200).json({
+    message: "Vendor updated successfully",
+    vendor: {
+      id: updatedVendor.id,
+      businessName: updatedVendor.businessName,
+      email: updatedVendor.user.email,
+      firstName: updatedVendor.user.firstName,
+      lastName: updatedVendor.user.lastName,
+      status: updatedVendor.status,
+    },
+  });
+});
+
 // Suspend Vendor
 const suspendVendor = asyncHandler(async (req, res) => {
   const { id } = req.params;
@@ -113,6 +166,8 @@ const viewVendorListings = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
+  editVendor,
+  deleteVendor,
   approveVendor,
   suspendVendor,
   viewVendorListings,

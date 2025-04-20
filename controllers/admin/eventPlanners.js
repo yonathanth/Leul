@@ -1,58 +1,54 @@
 const asyncHandler = require("express-async-handler");
 const prisma = require("../../prisma/client");
-const bcrypt = require("bcryptjs");
 
-// Add Event Planner
-const addEventPlanner = asyncHandler(async (req, res) => {
-  const { email, password, firstName, lastName, phone, companyName, bio } =
-    req.body;
+//edit event planner details
+const editEventPlanner = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { email, firstName, lastName, companyName } = req.body;
 
-  // Validate required fields
-  if (!email || !password || !firstName || !lastName) {
+  // Validate input
+  if (!email && !firstName && !lastName && !companyName) {
     res.status(400);
-    throw new Error("Email, password, first name, and last name are required");
+    throw new Error(
+      "At least one field (email, firstName, lastName, companyName) must be provided to update"
+    );
   }
 
-  // Check if user already exists
-  const existingUser = await prisma.user.findUnique({ where: { email } });
-  if (existingUser) {
-    res.status(400);
-    throw new Error("User with this email already exists");
+  // Check if user exists and is an event planner
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) {
+    res.status(404);
+    throw new Error("User not found");
   }
 
-  // Hash password
-  const hashedPassword = await bcrypt.hash(password, 10);
+  if (user.role !== "EVENT_PLANNER") {
+    res.status(400);
+    throw new Error("User is not an event planner");
+  }
 
-  // Create user with EVENT_PLANNER role
-  const user = await prisma.user.create({
-    data: {
-      email,
-      password: hashedPassword,
-      firstName,
-      lastName,
-      phone,
-      role: "EVENT_PLANNER",
-    },
+  // Prepare update data
+  const updateData = {};
+  if (email) updateData.email = email;
+  if (firstName) updateData.firstName = firstName;
+  if (lastName) updateData.lastName = lastName;
+  if (companyName) updateData.companyName = companyName;
+
+  // Update event planner details
+  const updatedUser = await prisma.user.update({
+    where: { id },
+    data: updateData,
   });
 
-  // Create event planner profile
-  const eventPlanner = await prisma.eventPlanner.create({
-    data: {
-      userId: user.id,
-      companyName,
-      bio,
-    },
-  });
-
-  res.status(201).json({
-    message: "Event Planner created successfully",
-    eventPlanner: {
-      id: eventPlanner.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      companyName: eventPlanner.companyName,
-      bio: eventPlanner.bio,
+  res.status(200).json({
+    message: "Event Planner updated successfully",
+    user: {
+      id: updatedUser.id,
+      email: updatedUser.email,
+      firstName: updatedUser.firstName,
+      lastName: updatedUser.lastName,
+      companyName: updatedUser.companyName,
+      role: updatedUser.role,
+      isBlocked: updatedUser.isBlocked,
     },
   });
 });
@@ -125,7 +121,7 @@ const viewPerformance = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  addEventPlanner,
+  editEventPlanner,
   removeEventPlanner,
   viewPerformance,
 };
