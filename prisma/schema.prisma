@@ -175,7 +175,7 @@ model Payment {
   amount      Float
   status      PaymentStatus @default(PENDING)
   method      String
-  transactionId String?
+  transactionId String?    // Chapa transaction reference (tx_ref)
   bookingId   String?
   booking     Booking?     @relation(fields: [bookingId], references: [id], name: "BookingPayments")
   assignmentId String?
@@ -190,6 +190,8 @@ model Payment {
   vendor      Vendor?      @relation(fields: [vendorId], references: [id], name: "VendorPayments")
   eventPlannerId String?
   eventPlanner EventPlanner? @relation(fields: [eventPlannerId], references: [id], name: "EventPlannerPayments")
+  adminSplit  Float?       // Store the admin's 10% split
+  vendorSplit Float?       // Store the vendor's 90% split
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 }
