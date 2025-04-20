@@ -7,7 +7,7 @@ const {
   suspendVendor,
   viewVendorListings,
 } = require("../../controllers/admin/vendors");
-const checkRole = require("../../middleware/authMiddleware");
+const { checkRole } = require("../../middleware/authMiddleware");
 
 // Middleware to ensure only ADMIN can access these routes
 router.use(checkRole("ADMIN"));

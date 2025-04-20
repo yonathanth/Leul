@@ -12,7 +12,8 @@ const {
   updateAvailability,
 } = require("../../controllers/vendor/updateAvailability");
 const { getPayments } = require("../../controllers/vendor/getPayments");
-const checkRole = require("../../middleware/authMiddleware");
+const { checkRole } = require("../../middleware/authMiddleware");
+const { editVendorAccount } = require("../../controllers/vendor/account");
 
 // Protect routes and ensure the user is a VENDOR
 router.use(checkRole("VENDOR"));
@@ -44,6 +45,6 @@ router.patch("/availability", updateAvailability);
 // Get vendor payments
 router.get("/payments", getPayments);
 
-router.patch("/:id", editvendorAccount);
+router.patch("/:id", editVendorAccount);
 
 module.exports = router;

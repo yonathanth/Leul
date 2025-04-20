@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { giveFeedback } = require("../../controllers/client/feedback");
-const checkRole = require("../../middleware/authMiddleware");
+const { checkRole } = require("../../middleware/authMiddleware");
 
 // Middleware to ensure only CLIENT can access this route
 router.use(checkRole("CLIENT"));

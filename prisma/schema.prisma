@@ -45,10 +45,12 @@ model User {
   role          UserRole
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
-  isBlocked  Boolean   @default(false) // Add for blocking users
-  isReported Boolean   @default(false)
+  isBlocked     Boolean     @default(false)
+  isReported    Boolean     @default(false)
+  isOnline      Boolean     @default(false) // Add for online status
+  conversations Conversation[] @relation("UserConversations") // Add relation to conversations
 
-  // Relationships
+  // Existing relationships
   clientProfile     Client?
   vendorProfile     Vendor?
   eventPlannerProfile EventPlanner?
@@ -58,6 +60,15 @@ model User {
   messagesReceived  Message[] @relation("MessageToUser")
   paymentsMade      Payment[] @relation("PaymentsMade")
   paymentsReceived  Payment[] @relation("PaymentsReceived")
+}
+
+// Add Conversation model
+model Conversation {
+  id          String     @id @default(uuid())
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  participants User[]     @relation("UserConversations") // Users in the conversation (vendor and client)
+  messages    Message[]  @relation("ConversationMessages") // Messages in this conversation
 }
 
 model Client {
@@ -201,18 +212,22 @@ model Feedback {
   updatedAt   DateTime   @updatedAt
 }
 
+// Update Message model
 model Message {
-  id          String     @id @default(uuid())
-  content     String
-  fromUserId  String
-  fromUser    User       @relation(fields: [fromUserId], references: [id], name: "MessageFromUser")
-  toUserId    String
-  toUser      User       @relation(fields: [toUserId], references: [id], name: "MessageToUser")
-  bookingId   String?
-  booking     Booking?   @relation(fields: [bookingId], references: [id], name: "BookingMessages")
+  id            String        @id @default(uuid())
+  content       String
+  fromUserId    String
+  fromUser      User          @relation(fields: [fromUserId], references: [id], name: "MessageFromUser")
+  toUserId      String
+  toUser        User          @relation(fields: [toUserId], references: [id], name: "MessageToUser")
+  conversationId String?      // Add conversation ID
+  conversation  Conversation? @relation(fields: [conversationId], references: [id], name: "ConversationMessages") // Link to conversation
+  bookingId     String?
+  booking       Booking?      @relation(fields: [bookingId], references: [id], name: "BookingMessages")
   eventPlannerId String?
-  eventPlanner EventPlanner? @relation(fields: [eventPlannerId], references: [id], name: "EventPlannerMessages")
-  read        Boolean    @default(false)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  eventPlanner  EventPlanner? @relation(fields: [eventPlannerId], references: [id], name: "EventPlannerMessages")
+  read          Boolean       @default(false)
+  lastSeen      DateTime?     // Add to track when the message was last seen
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 }
