@@ -100,28 +100,38 @@ io.on("connection", (socket) => {
   });
 });
 
-// Routes
+// Auth Routes
 app.use("/api/auth", require("./routes/shared/authRoutes"));
 
 // Vendor Routes
-app.use("/api/vendor", require("./routes/vendor/vendor"));
-app.use("/api/vendor/conversations", require("./routes/vendor/vendormessage")); // Add vendor conversation routes
+app.use("/api/vendor/account", require("./routes/vendor/account"));
+app.use("/api/vendor/availability", require("./routes/vendor/availability"));
+app.use("/api/vendor/conversation", require("./routes/vendor/conversation"));
+app.use("/api/vendor/dashboard", require("./routes/vendor/dashboard"));
+app.use("/api/vendor/payment", require("./routes/vendor/payment"));
+app.use("/api/vendor/services", require("./routes/vendor/services"));
 
 // Admin Routes
-app.use("/api/admin/clients", require("./routes/admin/clientRoutes"));
-app.use("/api/admin/dashboard", require("./routes/admin/dashboardRoutes"));
-app.use(
-  "/api/admin/event-planners",
-  require("./routes/admin/eventPlannerRoutes")
-);
-app.use("/api/admin/feedback", require("./routes/admin/feedbackRoutes"));
-app.use("/api/admin/vendors", require("./routes/admin/vendorRoutes"));
+app.use("/api/admin/clients", require("./routes/admin/client"));
+app.use("/api/admin/dashboard", require("./routes/admin/dashboard"));
+app.use("/api/admin/event-planners", require("./routes/admin/eventPlanners"));
+app.use("/api/admin/feedback", require("./routes/admin/feedback"));
+app.use("/api/admin/vendors", require("./routes/admin/vendors"));
+app.use("/api/admin/payments", require("./routes/admin/payment"));
 
 // Client Routes
-app.use("/api/client/bookings", require("./routes/client/bookingRoutes"));
-app.use("/api/client/feedback", require("./routes/client/feedbackRoutes"));
-app.use("/api/client/services", require("./routes/client/servicesRoutes"));
-app.use("/api/client/conversations", require("./routes/client/client")); // Add client conversation routes
+app.use("/api/client/bookings", require("./routes/client/booking"));
+app.use("/api/client/feedback", require("./routes/client/feedback"));
+app.use("/api/client/services", require("./routes/client/services"));
+app.use("/api/client", require("./routes/client/conversation"));
+app.use("/api/client/payment", require("./routes/client/payment"));
+
+const { createAdminSubaccount } = require("./utils/chapa");
+
+// After connecting to database
+createAdminSubaccount().then(() => {
+  console.log("Admin subaccount verified");
+});
 
 app.get("/", (req, res) => {
   res.send("Api Up and Running!");

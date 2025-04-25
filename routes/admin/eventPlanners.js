@@ -2,7 +2,6 @@ const express = require("express");
 const router = express.Router();
 const {
   removeEventPlanner,
-  viewPerformance,
   editEventPlanner,
 } = require("../../controllers/admin/eventPlanners");
 const { checkRole } = require("../../middleware/authMiddleware");
@@ -14,8 +13,5 @@ router.use(checkRole("ADMIN"));
 router.delete("/:id", removeEventPlanner);
 
 router.patch("/:id", editEventPlanner);
-
-// View Event Planner Performance
-router.get("/performance", viewPerformance);
 
 module.exports = router;

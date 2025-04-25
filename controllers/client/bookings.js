@@ -78,9 +78,28 @@ const bookEvent = asyncHandler(async (req, res) => {
       status: "PENDING",
     },
     include: {
-      service: { select: { name: true, price: true, category: true } },
-      vendor: { select: { businessName: true, rating: true } },
+      service: {
+        select: {
+          name: true,
+          price: true,
+          category: true,
+          vendor: { select: { businessName: true, rating: true } }, // Include vendor here
+        },
+      },
       eventPlanner: { select: { companyName: true } },
+    },
+  });
+
+  const payment = await prisma.payment.create({
+    data: {
+      amount: service.price,
+      status: "PENDING", // Will be updated when payment is initiated
+      method: "NOT_SELECTED",
+      bookingId: booking.id,
+      userId: userId,
+      recipientId: service.vendor.userId,
+      clientId: client.id,
+      vendorId: service.vendor.id,
     },
   });
 
@@ -89,6 +108,8 @@ const bookEvent = asyncHandler(async (req, res) => {
     booking: {
       id: booking.id,
       eventDate: booking.eventDate,
+      paymentStatus: "PENDING", // or payment.status
+      paymentId: payment.id,
       location: booking.location,
       status: booking.status,
       attendees: booking.attendees,
@@ -105,16 +126,13 @@ const bookEvent = asyncHandler(async (req, res) => {
             rating: booking.service.vendor.rating,
           }
         : null,
-      eventPlanner: booking.eventPlanner
-        ? { companyName: booking.eventPlanner.companyName }
-        : null,
     },
   });
 });
 
 // View Upcoming and Past Bookings
 const viewBookings = asyncHandler(async (req, res) => {
-  const userId = req.user.id; // Assumes user ID from auth middleware
+  const userId = req.user.id;
   const { type = "upcoming", page = 1, limit = 10 } = req.query;
 
   // Validate type
@@ -143,7 +161,7 @@ const viewBookings = asyncHandler(async (req, res) => {
 
   // Define conditions for upcoming and past bookings
   const today = new Date();
-  today.setHours(0, 0, 0, 0); // Normalize to start of day
+  today.setHours(0, 0, 0, 0);
 
   const where =
     type === "upcoming"
@@ -166,8 +184,14 @@ const viewBookings = asyncHandler(async (req, res) => {
   const bookings = await prisma.booking.findMany({
     where,
     include: {
-      service: { select: { name: true, price: true, category: true } },
-      vendor: { select: { businessName: true, rating: true } },
+      service: {
+        select: {
+          name: true,
+          price: true,
+          category: true,
+          vendor: { select: { businessName: true, rating: true } }, // Include vendor through service
+        },
+      },
       eventPlanner: { select: { companyName: true } },
     },
     orderBy: { eventDate: type === "upcoming" ? "asc" : "desc" },

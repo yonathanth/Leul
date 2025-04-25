@@ -26,7 +26,9 @@ const getPayments = asyncHandler(async (req, res) => {
     const validStatuses = ["PENDING", "COMPLETED", "FAILED", "REFUNDED"];
     if (!validStatuses.includes(status.toUpperCase())) {
       res.status(400);
-      throw new Error("Invalid status. Must be PENDING, COMPLETED, FAILED, or REFUNDED");
+      throw new Error(
+        "Invalid status. Must be PENDING, COMPLETED, FAILED, or REFUNDED"
+      );
     }
     paymentFilter.status = status.toUpperCase();
   }
@@ -87,7 +89,7 @@ const getPayments = asyncHandler(async (req, res) => {
       paymentId: payment.id,
       eventId: payment.bookingId,
       amount: payment.amount,
-      currency: "USD", // Assuming USD, can be dynamic if added to schema
+      currency: "ETB", // Assuming ETB, can be dynamic if added to schema
       status: payment.status.toLowerCase(),
       receivedAt: payment.createdAt.toISOString(),
     }));
@@ -98,9 +100,11 @@ const getPayments = asyncHandler(async (req, res) => {
       paymentId: payment.id,
       eventId: payment.bookingId,
       amount: payment.amount,
-      currency: "USD", // Assuming USD, can be dynamic if added to schema
+      currency: "ETB", // Assuming ETB, can be dynamic if added to schema
       status: payment.status.toLowerCase(),
-      dueDate: payment.dueDate ? payment.dueDate.toISOString().split("T")[0] : null,
+      dueDate: payment.dueDate
+        ? payment.dueDate.toISOString().split("T")[0]
+        : null,
     }));
 
   // Respond with the payment data

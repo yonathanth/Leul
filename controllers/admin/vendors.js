@@ -1,5 +1,6 @@
 const asyncHandler = require("express-async-handler");
 const prisma = require("../../prisma/client");
+const { createVendorSubaccount } = require("../../utils/chapa");
 
 // Approve Vendor
 const approveVendor = asyncHandler(async (req, res) => {
@@ -16,6 +17,17 @@ const approveVendor = asyncHandler(async (req, res) => {
   if (vendor.status === "APPROVED") {
     res.status(400);
     throw new Error("Vendor is already approved");
+  }
+
+  // Create Chapa subaccount for vendor
+  try {
+    await createVendorSubaccount(id);
+  } catch (error) {
+    console.error("Chapa Subaccount Creation Error:", error.message);
+    res.status(500);
+    throw new Error(
+      `Failed to create vendor payment account: ${error.message}`
+    );
   }
 
   // Update vendor status to APPROVED

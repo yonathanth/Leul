@@ -10,7 +10,7 @@ const {
 const { checkRole } = require("../../middleware/authMiddleware");
 
 // Middleware to ensure only ADMIN can access these routes
-router.use(checkRole("ADMIN"));
+router.use(checkRole(["ADMIN", "EVENT_PLANNER"]));
 
 // Edit Vendor
 router.patch("/:id", editVendor);

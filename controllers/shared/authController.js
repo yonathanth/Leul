@@ -68,24 +68,31 @@ const register = async (req, res) => {
         avatar: avatar || null,
       },
     });
+
+    let profileId = null;
     if (role === "CLIENT") {
-      await prisma.client.create({ data: { userId: newUser.id } });
+      const client = await prisma.client.create({
+        data: { userId: newUser.id },
+      });
+      profileId = client.id;
     } else if (role === "VENDOR") {
-      await prisma.vendor.create({
+      const vendor = await prisma.vendor.create({
         data: {
           userId: newUser.id,
           businessName: businessName || "Unnamed Business",
           serviceType: serviceType || "General",
         },
       });
+      profileId = vendor.id;
     } else if (role === "EVENT_PLANNER") {
-      await prisma.eventPlanner.create({
+      const eventPlanner = await prisma.eventPlanner.create({
         data: {
           userId: newUser.id,
           companyName: companyName || null,
           bio: bio || null,
         },
       });
+      profileId = eventPlanner.id;
     }
 
     const token = generateToken(newUser.id, newUser.role);
@@ -96,6 +103,7 @@ const register = async (req, res) => {
         id: newUser.id,
         email: newUser.email,
         role: newUser.role,
+        profileId,
       },
       token,
     });

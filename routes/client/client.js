@@ -82,7 +82,8 @@ router.post(
         email: client.email,
         firstName: client.firstName,
         lastName: client.lastName,
-        callbackUrl: `http://localhost:5000/api/client/bookings/${bookingId}/payment-callback`,
+        returnUrl: "https://www.google.com", // URL to redirect after payment
+        // callbackUrl: `http://localhost:5000/api/client/bookings/${bookingId}/payment-callback`,
         vendorAccount: {
           businessName: vendor.businessName,
           accountName: `${vendor.user.firstName} ${vendor.user.lastName}`, // Assuming vendor's bank account name matches their full name
