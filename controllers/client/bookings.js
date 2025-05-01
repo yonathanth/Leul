@@ -3,14 +3,8 @@ const prisma = require("../../prisma/client");
 
 // Book Event
 const bookEvent = asyncHandler(async (req, res) => {
-  const {
-    serviceId,
-    eventDate,
-    location,
-    attendees,
-    specialRequests,
-    eventPlannerId,
-  } = req.body;
+  const { serviceId, eventDate, location, attendees, specialRequests } =
+    req.body;
   const userId = req.user.id; // Assumes user ID from auth middleware
 
   // Validate required fields
@@ -44,17 +38,6 @@ const bookEvent = asyncHandler(async (req, res) => {
     throw new Error("Event date must be in the future");
   }
 
-  // Validate event planner if provided
-  if (eventPlannerId) {
-    const eventPlanner = await prisma.eventPlanner.findUnique({
-      where: { id: eventPlannerId },
-    });
-    if (!eventPlanner) {
-      res.status(404);
-      throw new Error("Event planner not found");
-    }
-  }
-
   // Find client profile
   const client = await prisma.client.findUnique({
     where: { userId },
@@ -70,7 +53,6 @@ const bookEvent = asyncHandler(async (req, res) => {
     data: {
       clientId: client.id,
       serviceId,
-      eventPlannerId,
       eventDate: eventDateObj,
       location,
       attendees: attendees ? parseInt(attendees) : undefined,
@@ -83,17 +65,17 @@ const bookEvent = asyncHandler(async (req, res) => {
           name: true,
           price: true,
           category: true,
-          vendor: { select: { businessName: true, rating: true } }, // Include vendor here
+          vendor: { select: { businessName: true, rating: true } },
         },
       },
-      eventPlanner: { select: { companyName: true } },
     },
   });
 
+  // Create payment record (associating with booking)
   const payment = await prisma.payment.create({
     data: {
       amount: service.price,
-      status: "PENDING", // Will be updated when payment is initiated
+      status: "PENDING",
       method: "NOT_SELECTED",
       bookingId: booking.id,
       userId: userId,
@@ -108,7 +90,7 @@ const bookEvent = asyncHandler(async (req, res) => {
     booking: {
       id: booking.id,
       eventDate: booking.eventDate,
-      paymentStatus: "PENDING", // or payment.status
+      paymentStatus: "PENDING",
       paymentId: payment.id,
       location: booking.location,
       status: booking.status,
@@ -189,10 +171,9 @@ const viewBookings = asyncHandler(async (req, res) => {
           name: true,
           price: true,
           category: true,
-          vendor: { select: { businessName: true, rating: true } }, // Include vendor through service
+          vendor: { select: { businessName: true, rating: true } },
         },
       },
-      eventPlanner: { select: { companyName: true } },
     },
     orderBy: { eventDate: type === "upcoming" ? "asc" : "desc" },
     skip: (pageNum - 1) * limitNum,
@@ -221,9 +202,6 @@ const viewBookings = asyncHandler(async (req, res) => {
           businessName: booking.service.vendor.businessName,
           rating: booking.service.vendor.rating,
         }
-      : null,
-    eventPlanner: booking.eventPlanner
-      ? { companyName: booking.eventPlanner.companyName }
       : null,
   }));
 
