@@ -51,10 +51,10 @@ const createVendorSubaccount = async (vendorId) => {
 
     // Test mode requires specific values
     const response = await chapa.post("/subaccount", {
-      business_name: "lelagnaw",
-      account_name: "lelagnaw",
+      business_name: vendor.businessName,
+      account_name: vendor.firstName + " " + vendor.lastName,
       bank_code: "946", // Use slug from bank list
-      account_number: "1001662301560", // 13 zeros for CBE test
+      account_number: vendor.bankAccountNumber || 1000488828147, // 13 zeros for CBE test
       split_type: "percentage",
       split_value: 0.9, // String value required
     });
