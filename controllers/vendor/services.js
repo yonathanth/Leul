@@ -190,4 +190,65 @@ const updateService = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { addService, deleteService, updateService };
+const getVendorServices = asyncHandler(async (req, res) => {
+  // Fetch the vendor record using the user ID from the decoded token
+  const vendor = await prisma.vendor.findUnique({
+    where: { userId: req.user.id },
+  });
+
+  if (!vendor) {
+    res.status(404);
+    throw new Error("Vendor profile not found");
+  }
+
+  const vendorId = vendor.id;
+
+  // Get all services for this vendor
+  const services = await prisma.service.findMany({
+    where: { vendorId },
+    orderBy: { createdAt: "desc" }, // Newest first
+    include: {
+      vendor: {
+        // Include basic vendor info if needed
+        select: {
+          businessName: true,
+          serviceType: true,
+        },
+      },
+      // Include other relations that exist in your Service model
+      // For example, if you have bookings:
+      bookings: true,
+    },
+  });
+
+  // Format the response
+  const formattedServices = services.map((service) => ({
+    serviceId: service.id,
+    title: service.name,
+    description: service.description,
+    price: service.price,
+    category: service.category,
+    vendorInfo: {
+      // Include vendor info in response
+      businessName: service.vendor.businessName,
+      serviceType: service.vendor.serviceType,
+    },
+    createdAt: service.createdAt,
+    updatedAt: service.updatedAt,
+    // Include bookings if they exist
+    bookings: service.bookings || [],
+  }));
+
+  res.status(200).json({
+    success: true,
+    count: services.length,
+    data: formattedServices,
+  });
+});
+
+module.exports = {
+  addService,
+  deleteService,
+  updateService,
+  getVendorServices,
+};

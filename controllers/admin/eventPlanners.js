@@ -4,13 +4,13 @@ const prisma = require("../../prisma/client");
 //edit event planner details
 const editEventPlanner = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { email, firstName, lastName, companyName } = req.body;
+  const { email, firstName, lastName } = req.body;
 
   // Validate input
-  if (!email && !firstName && !lastName && !companyName) {
+  if (!email && !firstName && !lastName) {
     res.status(400);
     throw new Error(
-      "At least one field (email, firstName, lastName, companyName) must be provided to update"
+      "At least one field (email, firstName, lastName) must be provided to update"
     );
   }
 
@@ -31,7 +31,6 @@ const editEventPlanner = asyncHandler(async (req, res) => {
   if (email) updateData.email = email;
   if (firstName) updateData.firstName = firstName;
   if (lastName) updateData.lastName = lastName;
-  if (companyName) updateData.companyName = companyName;
 
   // Update event planner details
   const updatedUser = await prisma.user.update({
@@ -46,7 +45,6 @@ const editEventPlanner = asyncHandler(async (req, res) => {
       email: updatedUser.email,
       firstName: updatedUser.firstName,
       lastName: updatedUser.lastName,
-      companyName: updatedUser.companyName,
       role: updatedUser.role,
       isBlocked: updatedUser.isBlocked,
     },

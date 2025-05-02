@@ -142,6 +142,25 @@ const login = async (req, res) => {
       return res.status(400).json({ error: "Invalid credentials." });
     }
 
+    // Get profile ID based on role
+    let profileId = null;
+    if (user.role === "CLIENT") {
+      const client = await prisma.client.findUnique({
+        where: { userId: user.id },
+      });
+      profileId = client?.id;
+    } else if (user.role === "VENDOR") {
+      const vendor = await prisma.vendor.findUnique({
+        where: { userId: user.id },
+      });
+      profileId = vendor?.id;
+    } else if (user.role === "EVENT_PLANNER") {
+      const eventPlanner = await prisma.eventPlanner.findUnique({
+        where: { userId: user.id },
+      });
+      profileId = eventPlanner?.id;
+    }
+
     // Generate token with role included
     const token = generateToken(user.id, user.role);
 
@@ -152,6 +171,7 @@ const login = async (req, res) => {
         id: user.id,
         email: user.email,
         role: user.role,
+        profileId,
       },
     });
   } catch (error) {

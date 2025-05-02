@@ -4,6 +4,7 @@ const {
   addService,
   deleteService,
   updateService,
+  getVendorServices,
 } = require("../../controllers/vendor/services");
 const { checkRole } = require("../../middleware/authMiddleware");
 
@@ -18,5 +19,8 @@ router.delete("/:serviceId", deleteService);
 
 // Update an existing service listing
 router.patch("/:serviceId", updateService);
+
+// Get all services for a vendor
+router.get("/", getVendorServices);
 
 module.exports = router;

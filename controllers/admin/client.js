@@ -154,7 +154,6 @@ const viewClientDetails = asyncHandler(async (req, res) => {
               attendees: true,
               specialRequests: true,
               service: { select: { name: true, price: true, category: true } },
-              eventPlanner: { select: { companyName: true } },
             },
           },
         },

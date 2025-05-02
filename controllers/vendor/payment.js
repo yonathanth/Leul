@@ -16,7 +16,7 @@ const getPayments = asyncHandler(async (req, res) => {
   const vendorId = vendor.id;
 
   // Extract query parameters for filtering
-  const { status, startDate, endDate, page = 1, limit = 10 } = req.query;
+  const { status, startDate, endDate } = req.query;
 
   // Build the query filter
   const paymentFilter = { vendorId };
@@ -54,33 +54,17 @@ const getPayments = asyncHandler(async (req, res) => {
     };
   }
 
-  // Parse pagination parameters
-  const pageNum = parseInt(page, 10);
-  const limitNum = parseInt(limit, 10);
-  if (isNaN(pageNum) || pageNum < 1 || isNaN(limitNum) || limitNum < 1) {
-    res.status(400);
-    throw new Error("Invalid page or limit value");
-  }
-
-  const skip = (pageNum - 1) * limitNum;
-
-  // Fetch payments
+  // Fetch all payments without pagination
   const payments = await prisma.payment.findMany({
     where: paymentFilter,
-    skip,
-    take: limitNum,
     select: {
       id: true,
       amount: true,
       status: true,
       createdAt: true,
       bookingId: true,
-      dueDate: true, // Not in schema, will be null unless added
     },
   });
-
-  // Total count for pagination
-  const total = await prisma.payment.count({ where: paymentFilter });
 
   // Separate received and pending payments
   const receivedPayments = payments
@@ -89,7 +73,7 @@ const getPayments = asyncHandler(async (req, res) => {
       paymentId: payment.id,
       eventId: payment.bookingId,
       amount: payment.amount,
-      currency: "ETB", // Assuming ETB, can be dynamic if added to schema
+      currency: "ETB",
       status: payment.status.toLowerCase(),
       receivedAt: payment.createdAt.toISOString(),
     }));
@@ -100,11 +84,8 @@ const getPayments = asyncHandler(async (req, res) => {
       paymentId: payment.id,
       eventId: payment.bookingId,
       amount: payment.amount,
-      currency: "ETB", // Assuming ETB, can be dynamic if added to schema
+      currency: "ETB",
       status: payment.status.toLowerCase(),
-      dueDate: payment.dueDate
-        ? payment.dueDate.toISOString().split("T")[0]
-        : null,
     }));
 
   // Respond with the payment data
@@ -114,11 +95,7 @@ const getPayments = asyncHandler(async (req, res) => {
       vendorId,
       receivedPayments,
       pendingPayments,
-      pagination: {
-        total,
-        page: pageNum,
-        limit: limitNum,
-      },
+      totalPayments: payments.length, // Optional: include total count if needed
     },
   });
 });

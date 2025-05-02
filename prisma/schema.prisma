@@ -51,15 +51,18 @@ model User {
   conversations Conversation[] @relation("UserConversations") // Add relation to conversations
 
   // Existing relationships
-  clientProfile     Client?
-  vendorProfile     Vendor?
-  eventPlannerProfile EventPlanner?
-  feedbackGiven     Feedback[] @relation("FeedbackFromUser")
-  feedbackReceived  Feedback[] @relation("FeedbackToUser")
-  messagesSent      Message[] @relation("MessageFromUser")
-  messagesReceived  Message[] @relation("MessageToUser")
-  paymentsMade      Payment[] @relation("PaymentsMade")
-  paymentsReceived  Payment[] @relation("PaymentsReceived")
+  clientProfile     Client?     @relation
+  vendorProfile     Vendor?     @relation
+  eventPlannerProfile EventPlanner? @relation
+  
+  feedbackGiven     Feedback[]  @relation("FeedbackFromUser")
+  feedbackReceived  Feedback[]  @relation("FeedbackToUser")
+  
+  messagesSent      Message[]   @relation("MessageFromUser")
+  messagesReceived  Message[]   @relation("MessageToUser")
+  
+  paymentsMade      Payment[]   @relation("PaymentsMade")
+  paymentsReceived  Payment[]   @relation("PaymentsReceived")
 }
 
 // Add Conversation model
@@ -74,7 +77,7 @@ model Conversation {
 model Client {
   id          String     @id @default(uuid())
   userId      String     @unique
-  user        User       @relation(fields: [userId], references: [id])
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   bookings    Booking[]
   feedbacks   Feedback[] @relation("ClientFeedbacks")
   payments    Payment[]  @relation("ClientPayments")
@@ -83,7 +86,7 @@ model Client {
 model EventPlanner {
   id          String     @id @default(uuid())
   userId      String     @unique
-  user        User       @relation(fields: [userId], references: [id])
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   bio         String?
   messages    Message[]  @relation("EventPlannerMessages")
 }
@@ -91,14 +94,13 @@ model EventPlanner {
 model Vendor {
   id               String     @id @default(uuid())
   userId           String     @unique
-  user             User       @relation(fields: [userId], references: [id])
+  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   businessName     String
   description      String?
   serviceType      String
   status           VendorStatus @default(PENDING_APPROVAL)
   rating           Float?     @default(0)
   services         Service[]
-  availability     Availability[]
   payments         Payment[]  @relation("VendorPayments")
   feedbacks        Feedback[] @relation("VendorFeedbacks")
   chapaSubaccountId String?   // Add this line
@@ -120,20 +122,8 @@ model Service {
   price       Float
   category    String
   vendorId    String
-  vendor      Vendor     @relation(fields: [vendorId], references: [id])
+  vendor      Vendor     @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   bookings    Booking[]  @relation("ServiceBookings")
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-}
-
-
-model Availability {
-  id          String     @id @default(uuid())
-  vendorId    String
-  vendor      Vendor     @relation(fields: [vendorId], references: [id])
-  date        DateTime
-  isAvailable Boolean    @default(true)
-  reason      String?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 }
@@ -143,19 +133,19 @@ model Payment {
   amount      Float
   status      PaymentStatus @default(PENDING)
   method      String
-  transactionId String?    // Chapa transaction reference (tx_ref)
+  transactionId String?    
   bookingId   String?
-  booking     Booking?     @relation(fields: [bookingId], references: [id], name: "BookingPayments")
+  booking     Booking?     @relation(fields: [bookingId], references: [id], name: "BookingPayments", onDelete: Cascade)
   userId      String
-  user        User         @relation(fields: [userId], references: [id], name: "PaymentsMade")
+  user        User         @relation(fields: [userId], references: [id], name: "PaymentsMade", onDelete: Cascade)
   recipientId String
-  recipient   User         @relation(fields: [recipientId], references: [id], name: "PaymentsReceived")
+  recipient   User         @relation(fields: [recipientId], references: [id], name: "PaymentsReceived", onDelete: Cascade)
   clientId    String?
-  client      Client?      @relation(fields: [clientId], references: [id], name: "ClientPayments")
+  client      Client?      @relation(fields: [clientId], references: [id], name: "ClientPayments", onDelete: Cascade)
   vendorId    String?
-  vendor      Vendor?      @relation(fields: [vendorId], references: [id], name: "VendorPayments")
-  adminSplit  Float?       // Store the admin's 10% split
-  vendorSplit Float?       // Store the vendor's 90% split
+  vendor      Vendor?      @relation(fields: [vendorId], references: [id], name: "VendorPayments", onDelete: Cascade)
+  adminSplit  Float?       
+  vendorSplit Float?       
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 }
@@ -163,7 +153,7 @@ model Payment {
 model Booking {
   id           String       @id @default(uuid())
   clientId     String
-  client       Client       @relation(fields: [clientId], references: [id])
+  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
   serviceId    String
   service      Service      @relation(fields: [serviceId], references: [id], name: "ServiceBookings")
   eventDate    DateTime
@@ -177,20 +167,21 @@ model Booking {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 }
+
 model Feedback {
   id          String     @id @default(uuid())
   rating      Int
   comment     String?
   bookingId   String
-  booking     Booking    @relation(fields: [bookingId], references: [id], name: "BookingFeedback")
+  booking     Booking    @relation(fields: [bookingId], references: [id], name: "BookingFeedback", onDelete: Cascade)
   fromUserId  String
-  fromUser    User       @relation(fields: [fromUserId], references: [id], name: "FeedbackFromUser")
+  fromUser    User       @relation(fields: [fromUserId], references: [id], name: "FeedbackFromUser", onDelete: Cascade)
   toUserId    String
-  toUser      User       @relation(fields: [toUserId], references: [id], name: "FeedbackToUser")
+  toUser      User       @relation(fields: [toUserId], references: [id], name: "FeedbackToUser", onDelete: Cascade)
   vendorId    String?
-  vendor      Vendor?    @relation(fields: [vendorId], references: [id], name: "VendorFeedbacks")
+  vendor      Vendor?    @relation(fields: [vendorId], references: [id], name: "VendorFeedbacks", onDelete: Cascade)
   clientId    String?
-  client      Client?    @relation(fields: [clientId], references: [id], name: "ClientFeedbacks")
+  client      Client?    @relation(fields: [clientId], references: [id], name: "ClientFeedbacks", onDelete: Cascade)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 }
@@ -200,17 +191,17 @@ model Message {
   id            String        @id @default(uuid())
   content       String
   fromUserId    String
-  fromUser      User          @relation(fields: [fromUserId], references: [id], name: "MessageFromUser")
+  fromUser      User          @relation(fields: [fromUserId], references: [id], name: "MessageFromUser", onDelete: Cascade)
   toUserId      String
-  toUser        User          @relation(fields: [toUserId], references: [id], name: "MessageToUser")
-  conversationId String?      // Add conversation ID
-  conversation  Conversation? @relation(fields: [conversationId], references: [id], name: "ConversationMessages") // Link to conversation
+  toUser        User          @relation(fields: [toUserId], references: [id], name: "MessageToUser", onDelete: Cascade)
+  conversationId String?      
+  conversation  Conversation? @relation(fields: [conversationId], references: [id], name: "ConversationMessages", onDelete: Cascade)
   bookingId     String?
-  booking       Booking?      @relation(fields: [bookingId], references: [id], name: "BookingMessages")
+  booking       Booking?      @relation(fields: [bookingId], references: [id], name: "BookingMessages", onDelete: Cascade)
   eventPlannerId String?
-  eventPlanner  EventPlanner? @relation(fields: [eventPlannerId], references: [id], name: "EventPlannerMessages")
+  eventPlanner  EventPlanner? @relation(fields: [eventPlannerId], references: [id], name: "EventPlannerMessages", onDelete: Cascade)
   read          Boolean       @default(false)
-  lastSeen      DateTime?     // Add to track when the message was last seen
+  lastSeen      DateTime?     
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 }

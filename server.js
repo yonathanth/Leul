@@ -105,8 +105,7 @@ app.use("/api/auth", require("./routes/shared/authRoutes"));
 
 // Vendor Routes
 app.use("/api/vendor/account", require("./routes/vendor/account"));
-app.use("/api/vendor/availability", require("./routes/vendor/availability"));
-app.use("/api/vendor/conversation", require("./routes/vendor/conversation"));
+app.use("/api/vendor", require("./routes/vendor/conversation"));
 app.use("/api/vendor/dashboard", require("./routes/vendor/dashboard"));
 app.use("/api/vendor/payment", require("./routes/vendor/payment"));
 app.use("/api/vendor/services", require("./routes/vendor/services"));
@@ -125,6 +124,7 @@ app.use("/api/client/feedback", require("./routes/client/feedback"));
 app.use("/api/client/services", require("./routes/client/services"));
 app.use("/api/client", require("./routes/client/conversation"));
 app.use("/api/client/payment", require("./routes/client/payment"));
+app.use("/api/client/account", require("./routes/client/account"));
 
 const { createAdminSubaccount } = require("./utils/chapa");
 

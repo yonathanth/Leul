@@ -1,28 +1,46 @@
 const asyncHandler = require("express-async-handler");
 const prisma = require("../../prisma/client");
 
+// Extend Prisma client to include computed fields
+const prismaWithExtensions = prisma.$extends({
+  result: {
+    user: {
+      fullName: {
+        needs: { firstName: true, lastName: true },
+        compute(user) {
+          return `${user.firstName} ${user.lastName}`;
+        },
+      },
+    },
+  },
+});
+
 // Get payment insights for Admin dashboard
 const getPaymentInsights = asyncHandler(async (req, res) => {
   // Total payment statistics
-  const totalPayments = await prisma.payment.count();
-  const totalAmount = await prisma.payment.aggregate({
-    _sum: { amount: true },
-  });
-  const averagePayment = await prisma.payment.aggregate({
-    _avg: { amount: true },
-  });
+  const [totalPayments, totalAmount, averagePayment] = await Promise.all([
+    prisma.payment.count(),
+    prisma.payment.aggregate({
+      _sum: { amount: true },
+    }),
+    prisma.payment.aggregate({
+      _avg: { amount: true },
+    }),
+  ]);
 
-  // Payment status breakdown
-  const paymentStatusBreakdown = await prisma.payment.groupBy({
-    by: ["status"],
-    _count: { id: true },
-  });
-
-  // Payment method distribution
-  const paymentMethodDistribution = await prisma.payment.groupBy({
-    by: ["method"],
-    _count: { id: true },
-  });
+  // Payment status breakdown and method distribution
+  const [paymentStatusBreakdown, paymentMethodDistribution] = await Promise.all(
+    [
+      prisma.payment.groupBy({
+        by: ["status"],
+        _count: { id: true },
+      }),
+      prisma.payment.groupBy({
+        by: ["method"],
+        _count: { id: true },
+      }),
+    ]
+  );
 
   // Split amounts (admin and vendor)
   const splitAmounts = await prisma.payment.aggregate({
@@ -46,25 +64,54 @@ const getPaymentInsights = asyncHandler(async (req, res) => {
       status: true,
       method: true,
       createdAt: true,
-      user: { select: { name: true } },
-      recipient: { select: { name: true } },
+      user: {
+        select: {
+          firstName: true,
+          lastName: true,
+          email: true,
+        },
+      },
+      recipient: {
+        select: {
+          firstName: true,
+          lastName: true,
+          email: true,
+        },
+      },
     },
     orderBy: { createdAt: "desc" },
     take: 10,
   });
 
   // Monthly payment trends (last 12 months)
-  const monthlyTrends = await prisma.payment.groupBy({
-    by: ["createdAt"],
-    _sum: { amount: true },
-    _count: { id: true },
-    where: {
-      createdAt: {
-        gte: new Date(new Date().setMonth(new Date().getMonth() - 12)),
-      },
-    },
-    orderBy: { createdAt: "asc" },
-  });
+  const twelveMonthsAgo = new Date();
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+  const monthlyTrendsRaw = await prisma.$queryRaw`
+    SELECT 
+      DATE_FORMAT(createdAt, '%Y-%m') as month,
+      SUM(amount) as totalAmount,
+      COUNT(id) as paymentCount
+    FROM Payment
+    WHERE createdAt >= ${twelveMonthsAgo}
+    GROUP BY DATE_FORMAT(createdAt, '%Y-%m')
+    ORDER BY month ASC
+  `;
+
+  const monthlyTrends = monthlyTrendsRaw.map((trend) => ({
+    month: trend.month,
+    totalAmount: parseFloat(trend.totalAmount),
+    paymentCount: trend.paymentCount,
+  }));
+
+  // Format recent payments with full names
+  const formattedRecentPayments = recentPayments.map((payment) => ({
+    ...payment,
+    userName: `${payment.user.firstName} ${payment.user.lastName}`,
+    recipientName: `${payment.recipient.firstName} ${payment.recipient.lastName}`,
+    userEmail: payment.user.email,
+    recipientEmail: payment.recipient.email,
+  }));
 
   res.status(200).json({
     totalPayments,
@@ -76,12 +123,8 @@ const getPaymentInsights = asyncHandler(async (req, res) => {
       adminSplit: splitAmounts._sum.adminSplit || 0,
       vendorSplit: splitAmounts._sum.vendorSplit || 0,
     },
-    recentPayments,
-    monthlyTrends: monthlyTrends.map((trend) => ({
-      month: trend.createdAt.toISOString().slice(0, 7),
-      totalAmount: trend._sum.amount,
-      paymentCount: trend._count.id,
-    })),
+    recentPayments: formattedRecentPayments,
+    monthlyTrends,
   });
 });
 
@@ -98,33 +141,72 @@ const getPaymentReport = asyncHandler(async (req, res) => {
   if (status) where.status = status;
   if (method) where.method = method;
 
-  const payments = await prisma.payment.findMany({
-    where,
-    select: {
-      id: true,
-      amount: true,
-      status: true,
-      method: true,
-      transactionId: true,
-      adminSplit: true,
-      vendorSplit: true,
-      createdAt: true,
-      user: { select: { name: true, email: true } },
-      recipient: { select: { name: true, email: true } },
-      booking: { select: { id: true, eventDate: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const [payments, summary] = await Promise.all([
+    prisma.payment.findMany({
+      where,
+      select: {
+        id: true,
+        amount: true,
+        status: true,
+        method: true,
+        transactionId: true,
+        adminSplit: true,
+        vendorSplit: true,
+        createdAt: true,
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        recipient: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        booking: {
+          select: {
+            id: true,
+            eventDate: true,
+            service: {
+              select: {
+                name: true,
+                vendor: {
+                  select: {
+                    businessName: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.payment.aggregate({
+      where,
+      _sum: { amount: true, adminSplit: true, vendorSplit: true },
+      _count: { id: true },
+      _avg: { amount: true },
+    }),
+  ]);
 
-  const summary = await prisma.payment.aggregate({
-    where,
-    _sum: { amount: true, adminSplit: true, vendorSplit: true },
-    _count: { id: true },
-    _avg: { amount: true },
-  });
+  // Format payments with full names and additional info
+  const formattedPayments = payments.map((payment) => ({
+    ...payment,
+    userName: `${payment.user.firstName} ${payment.user.lastName}`,
+    userEmail: payment.user.email,
+    recipientName: `${payment.recipient.firstName} ${payment.recipient.lastName}`,
+    recipientEmail: payment.recipient.email,
+    serviceName: payment.booking?.service?.name,
+    vendorName: payment.booking?.service?.vendor?.businessName,
+  }));
 
   res.status(200).json({
-    payments,
+    payments: formattedPayments,
     summary: {
       totalPayments: summary._count.id,
       totalAmount: summary._sum.amount || 0,

@@ -5,7 +5,9 @@ const prisma = require("../../prisma/client");
 const startConversation = asyncHandler(async (req, res) => {
   const { vendorId } = req.body;
   const clientId = req.user.id;
-
+  console.log("req.user:", req.user);
+  console.log("vendorId:", vendorId);
+  console.log("clientId:", clientId);
   const conversation = await prisma.conversation.create({
     data: {
       participants: {

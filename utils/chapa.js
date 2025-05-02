@@ -54,7 +54,7 @@ const createVendorSubaccount = async (vendorId) => {
       business_name: vendor.businessName,
       account_name: vendor.firstName + " " + vendor.lastName,
       bank_code: "946", // Use slug from bank list
-      account_number: vendor.bankAccountNumber || 1000488828147, // 13 zeros for CBE test
+      account_number: vendor.bankAccountNumber || 1000488928147, // 13 zeros for CBE test
       split_type: "percentage",
       split_value: 0.9, // String value required
     });

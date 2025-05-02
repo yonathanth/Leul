@@ -7,3 +7,5 @@ const { checkRole } = require("../../middleware/authMiddleware");
 router.use(checkRole("CLIENT"));
 
 router.patch("/:id", editAccount); // Edit account details
+
+module.exports = router;
