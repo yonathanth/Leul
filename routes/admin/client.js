@@ -1,28 +1,34 @@
 const express = require("express");
 const router = express.Router();
 const {
-  blockClient,
-  editClient,
-  reportClient,
-  viewClientDetails,
+  getClients,
+  getClientById,
+  createClient,
+  updateClient,
   deleteClient,
+  updateClientPassword,
 } = require("../../controllers/admin/client");
 const { checkRole } = require("../../middleware/authMiddleware");
 
 // Middleware to ensure only ADMIN can access these routes
-router.use(checkRole(["ADMIN", "EVENT_PLANNER"]));
+router.use(checkRole("ADMIN"));
 
-// Block or Unblock Client
-router.patch("/:id/block", blockClient);
+// Get all clients
+router.get("/", getClients);
 
+// Get client by ID
+router.get("/:id", getClientById);
+
+// Create new client
+router.post("/", createClient);
+
+// Update client
+router.put("/:id", updateClient);
+
+// Delete client
 router.delete("/:id", deleteClient);
 
-router.patch("/:id", editClient);
-
-// Report or Unreport Client
-router.patch("/:id/report", reportClient);
-
-// View Client Orders and Profile
-router.get("/:id", viewClientDetails);
+// Update client password
+router.patch("/:id/password", updateClientPassword);
 
 module.exports = router;

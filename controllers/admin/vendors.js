@@ -70,38 +70,57 @@ const deleteVendor = asyncHandler(async (req, res) => {
 
 const editVendor = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { businessName, serviceType, status } = req.body;
+  const { businessName, serviceType, isActive, isBlocked, name, email, phone } = req.body;
 
   // Check if vendor exists
-  const vendor = await prisma.vendor.findUnique({ where: { id } });
+  const vendor = await prisma.vendor.findUnique({ 
+    where: { id },
+    include: {
+      user: true
+    }
+  });
+  
   if (!vendor) {
     res.status(404);
     throw new Error("Vendor not found");
   }
 
-  // Update vendor details
-  const updatedVendor = await prisma.vendor.update({
-    where: { id },
-    data: {
-      businessName,
-      serviceType,
-      status,
-    },
-    include: {
-      user: { select: { email: true, firstName: true, lastName: true } },
-    },
-  });
+  // Split name into first and last name
+  const [firstName, ...lastNameParts] = name.split(' ');
+  const lastName = lastNameParts.join(' ');
+
+  // Update vendor and user details
+  const [updatedVendor, updatedUser] = await Promise.all([
+    prisma.vendor.update({
+      where: { id },
+      data: {
+        businessName,
+        serviceType,
+        status: isActive ? "APPROVED" : "SUSPENDED",
+      },
+    }),
+    prisma.user.update({
+      where: { id: vendor.userId },
+      data: {
+        email,
+        firstName,
+        lastName,
+        phone,
+        isBlocked,
+      },
+    }),
+  ]);
 
   res.status(200).json({
-    message: "Vendor updated successfully",
-    vendor: {
-      id: updatedVendor.id,
-      businessName: updatedVendor.businessName,
-      email: updatedVendor.user.email,
-      firstName: updatedVendor.user.firstName,
-      lastName: updatedVendor.user.lastName,
-      status: updatedVendor.status,
-    },
+    id: updatedVendor.id,
+    businessName: updatedVendor.businessName,
+    serviceType: updatedVendor.serviceType,
+    isActive: updatedVendor.status === "APPROVED",
+    email: updatedUser.email,
+    name: `${updatedUser.firstName} ${updatedUser.lastName}`,
+    phone: updatedUser.phone,
+    isBlocked: updatedUser.isBlocked,
+    avatar: updatedUser.avatar,
   });
 });
 
@@ -148,7 +167,7 @@ const suspendVendor = asyncHandler(async (req, res) => {
 const viewVendorListings = asyncHandler(async (req, res) => {
   const vendors = await prisma.vendor.findMany({
     include: {
-      user: { select: { email: true, firstName: true, lastName: true } },
+      user: { select: { email: true, firstName: true, lastName: true, phone: true } },
       services: {
         select: {
           id: true,
@@ -167,8 +186,8 @@ const viewVendorListings = asyncHandler(async (req, res) => {
     userId: vendor.userId,
     businessName: vendor.businessName,
     email: vendor.user.email,
-    firstName: vendor.user.firstName,
-    lastName: vendor.user.lastName,
+    name: `${vendor.user.firstName} ${vendor.user.lastName}`,
+    phone: vendor.user.phone,
     serviceType: vendor.serviceType,
     status: vendor.status,
     rating: vendor.rating,
@@ -178,10 +197,56 @@ const viewVendorListings = asyncHandler(async (req, res) => {
   res.status(200).json(vendorListings);
 });
 
+// Get vendor by ID
+const getVendorById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  // Find vendor with user details
+  const vendor = await prisma.vendor.findUnique({
+    where: { id },
+    include: {
+      user: {
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          avatar: true,
+          isBlocked: true,
+          createdAt: true,
+        },
+      },
+    },
+  });
+
+  if (!vendor) {
+    res.status(404);
+    throw new Error("Vendor not found");
+  }
+
+  // Format the response
+  const formattedVendor = {
+    id: vendor.id,
+    businessName: vendor.businessName,
+    serviceType: vendor.serviceType,
+    status: vendor.status,
+    email: vendor.user.email,
+    name: `${vendor.user.firstName} ${vendor.user.lastName}`,
+    phone: vendor.user.phone,
+    avatar: vendor.user.avatar,
+    isBlocked: vendor.user.isBlocked,
+    createdAt: vendor.user.createdAt,
+  };
+
+  res.status(200).json(formattedVendor);
+});
+
 module.exports = {
   editVendor,
   deleteVendor,
   approveVendor,
   suspendVendor,
   viewVendorListings,
+  getVendorById,
 };

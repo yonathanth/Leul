@@ -3,74 +3,80 @@ const prisma = require("../../prisma/client");
 
 // Overview stats for Admin dashboard
 const getOverview = asyncHandler(async (req, res) => {
-  const totalUsers = await prisma.client.count();
-  const totalVendors = await prisma.vendor.count();
-  const totalEventPlanners = await prisma.eventPlanner.count();
-  const totalActiveBookings = await prisma.booking.count({
-    where: { status: { in: ["PENDING", "CONFIRMED"] } },
-  });
-  const totalPayments = await prisma.payment.count();
+  // Get current counts
+  const [totalClients, totalVendors, totalEventPlanners, activeBookings] =
+    await Promise.all([
+      prisma.client.count(),
+      prisma.vendor.count(),
+      prisma.eventPlanner.count(),
+      prisma.booking.count({
+        where: { status: { in: ["PENDING", "CONFIRMED"] } },
+      }),
+    ]);
 
-  // Get 5 most recent payments
-  const recentPayments = await prisma.payment.findMany({
-    orderBy: {
-      createdAt: "desc",
-    },
-    take: 5,
-    include: {
-      user: {
-        select: {
-          firstName: true,
-          lastName: true,
-          email: true,
-        },
-      },
-      recipient: {
-        select: {
-          firstName: true,
-          lastName: true,
-          email: true,
-        },
-      },
-    },
-  });
+  // Get counts from 30 days ago for growth calculation
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  // Get 5 most recent feedbacks
-  const recentFeedbacks = await prisma.feedback.findMany({
-    orderBy: {
-      createdAt: "desc",
-    },
-    take: 5,
-    include: {
-      fromUser: {
-        select: {
-          firstName: true,
-          lastName: true,
+  const [
+    previousClients,
+    previousVendors,
+    previousEventPlanners,
+    previousActiveBookings,
+  ] = await Promise.all([
+    prisma.client.count({
+      where: {
+        user: {
+          createdAt: {
+            lt: thirtyDaysAgo,
+          },
         },
       },
-      toUser: {
-        select: {
-          firstName: true,
-          lastName: true,
+    }),
+    prisma.vendor.count({
+      where: {
+        user: {
+          createdAt: {
+            lt: thirtyDaysAgo,
+          },
         },
       },
-      booking: {
-        select: {
-          id: true,
-          status: true,
+    }),
+    prisma.eventPlanner.count({
+      where: {
+        user: {
+          createdAt: {
+            lt: thirtyDaysAgo,
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.booking.count({
+      where: {
+        status: { in: ["PENDING", "CONFIRMED"] },
+        createdAt: { lt: thirtyDaysAgo },
+      },
+    }),
+  ]);
+
+  // Calculate growth percentages
+  const calculateGrowth = (current, previous) => {
+    if (previous === 0) return 0;
+    return Number((((current - previous) / previous) * 100).toFixed(1));
+  };
 
   res.status(200).json({
-    totalUsers,
+    totalClients,
+    clientGrowth: calculateGrowth(totalClients, previousClients),
     totalVendors,
+    vendorGrowth: calculateGrowth(totalVendors, previousVendors),
     totalEventPlanners,
-    totalActiveBookings,
-    totalPayments,
-    recentPayments,
-    recentFeedbacks,
+    eventPlannerGrowth: calculateGrowth(
+      totalEventPlanners,
+      previousEventPlanners
+    ),
+    activeBookings,
+    bookingGrowth: calculateGrowth(activeBookings, previousActiveBookings),
   });
 });
 

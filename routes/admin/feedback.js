@@ -3,16 +3,24 @@ const router = express.Router();
 const {
   reviewComplaints,
   reviewRatings,
+  getFeedback,
+  getFeedbackById,
 } = require("../../controllers/admin/feedback");
 const { checkRole } = require("../../middleware/authMiddleware");
 
 // Middleware to ensure only ADMIN can access these routes
 router.use(checkRole(["ADMIN", "EVENT_PLANNER"]));
 
-// Review Complaints
+// Get all feedback
+router.get("/", getFeedback);
+
+// Get feedback by ID
+router.get("/:id", getFeedbackById);
+
+// Review complaints
 router.get("/complaints", reviewComplaints);
 
-// Review Ratings
+// Review ratings
 router.get("/ratings", reviewRatings);
 
 module.exports = router;
