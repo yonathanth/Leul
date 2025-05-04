@@ -65,33 +65,19 @@ const bookEvent = asyncHandler(async (req, res) => {
           name: true,
           price: true,
           category: true,
-          vendor: { select: { businessName: true, rating: true } },
+          vendor: { select: { businessName: true, rating: true, id: true } },
         },
       },
     },
   });
 
-  // Create payment record (associating with booking)
-  const payment = await prisma.payment.create({
-    data: {
-      amount: service.price,
-      status: "PENDING",
-      method: "NOT_SELECTED",
-      bookingId: booking.id,
-      userId: userId,
-      recipientId: service.vendor.userId,
-      clientId: client.id,
-      vendorId: service.vendor.id,
-    },
-  });
+  // Removed payment creation code - payment will be created during payment initiation
 
   res.status(201).json({
     message: "Event booked successfully",
     booking: {
       id: booking.id,
       eventDate: booking.eventDate,
-      paymentStatus: "PENDING",
-      paymentId: payment.id,
       location: booking.location,
       status: booking.status,
       attendees: booking.attendees,
@@ -105,6 +91,7 @@ const bookEvent = asyncHandler(async (req, res) => {
       vendor: booking.service.vendor
         ? {
             businessName: booking.service.vendor.businessName,
+            id: booking.service.vendor.id,
             rating: booking.service.vendor.rating,
           }
         : null,

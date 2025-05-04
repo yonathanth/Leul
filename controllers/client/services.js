@@ -55,6 +55,7 @@ const browseServices = asyncHandler(async (req, res) => {
           id: true,
           businessName: true,
           rating: true,
+          userId: true,
           user: { select: { firstName: true, lastName: true } },
         },
       },
@@ -77,6 +78,7 @@ const browseServices = asyncHandler(async (req, res) => {
     createdAt: service.createdAt,
     vendor: {
       id: service.vendor.id,
+      userId: service.vendor.userId,
       businessName: service.vendor.businessName,
       rating: service.vendor.rating,
       ownerName: `${service.vendor.user.firstName} ${service.vendor.user.lastName}`,

@@ -43,7 +43,10 @@ const getDashboardOverview = asyncHandler(async (req, res) => {
   });
 
   // Calculate total revenue
-  const totalRevenue = payments.reduce((sum, payment) => sum + payment.amount, 0);
+  const totalRevenue = payments.reduce(
+    (sum, payment) => sum + payment.amount,
+    0
+  );
 
   // Calculate monthly revenue breakdown
   const revenueBreakdown = payments.reduce((acc, payment) => {

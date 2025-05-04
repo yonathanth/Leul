@@ -163,7 +163,6 @@ model Booking {
   status       BookingStatus @default(PENDING)
   payments     Payment[]     @relation("BookingPayments")
   feedback     Feedback[]    @relation("BookingFeedback")
-  messages     Message[]     @relation("BookingMessages")
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 }
@@ -196,8 +195,6 @@ model Message {
   toUser        User          @relation(fields: [toUserId], references: [id], name: "MessageToUser", onDelete: Cascade)
   conversationId String?      
   conversation  Conversation? @relation(fields: [conversationId], references: [id], name: "ConversationMessages", onDelete: Cascade)
-  bookingId     String?
-  booking       Booking?      @relation(fields: [bookingId], references: [id], name: "BookingMessages", onDelete: Cascade)
   eventPlannerId String?
   eventPlanner  EventPlanner? @relation(fields: [eventPlannerId], references: [id], name: "EventPlannerMessages", onDelete: Cascade)
   read          Boolean       @default(false)

@@ -58,6 +58,83 @@ const editAccount = asyncHandler(async (req, res) => {
   });
 });
 
+// Get User Profile
+const getProfile = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+
+  // Get user with client profile
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      clientProfile: true,
+    },
+  });
+
+  if (!user) {
+    res.status(404);
+    throw new Error("User not found");
+  }
+
+  // Get statistics
+  const bookingStats = await prisma.booking.groupBy({
+    by: ["status"],
+    where: {
+      clientId: user.clientProfile.id,
+    },
+    _count: {
+      _all: true,
+    },
+  });
+
+  const totalBookings = bookingStats.reduce(
+    (sum, stat) => sum + stat._count._all,
+    0
+  );
+
+  // Format the booking stats into an object
+  const bookingCounts = {};
+  bookingStats.forEach((stat) => {
+    bookingCounts[stat.status] = stat._count._all;
+  });
+
+  // Get payment statistics
+  const paymentStats = await prisma.payment.aggregate({
+    where: {
+      userId,
+      status: "COMPLETED",
+    },
+    _count: {
+      _all: true,
+    },
+    _sum: {
+      amount: true,
+    },
+  });
+
+  // Format response
+  res.status(200).json({
+    profile: {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phone: user.phone || null,
+      avatar: user.avatar || null,
+      role: user.role,
+      createdAt: user.createdAt,
+    },
+    stats: {
+      totalBookings,
+      bookings: bookingCounts,
+      payments: {
+        count: paymentStats._count._all,
+        totalAmount: paymentStats._sum.amount || 0,
+      },
+    },
+  });
+});
+
 module.exports = {
   editAccount,
+  getProfile,
 };

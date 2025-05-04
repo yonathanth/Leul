@@ -19,7 +19,7 @@ app.use(express.urlencoded({ extended: false }));
 
 // CORS configuration for Express
 const corsOptions = {
-  origin: "http://localhost:3000", // Ensure this matches your frontend URL
+  origin: "http://localhost:5173", // Ensure this matches your frontend URL
   methods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
   optionsSuccessStatus: 200,
 };
@@ -30,7 +30,7 @@ app.use("/public", express.static("public"));
 // Set up Socket.IO with CORS
 const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:3000", // Match your frontend URL
+    origin: "http://localhost:5173", // Match your frontend URL
     methods: ["GET", "POST"],
   },
 });
@@ -125,6 +125,7 @@ app.use("/api/client/services", require("./routes/client/services"));
 app.use("/api/client", require("./routes/client/conversation"));
 app.use("/api/client/payment", require("./routes/client/payment"));
 app.use("/api/client/account", require("./routes/client/account"));
+app.use("/api/client/dashboard", require("./routes/client/dashboard"));
 
 const { createAdminSubaccount } = require("./utils/chapa");
 

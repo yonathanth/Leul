@@ -244,4 +244,108 @@ const handleWebhook = asyncHandler(async (req, res) => {
   }
 });
 
-module.exports = { initiatePayment, verifyPayment, handleWebhook };
+// Get All Payments for the User
+const getPayments = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { page = 1, limit = 10, status } = req.query;
+
+  // Convert page and limit to integers
+  const pageNum = parseInt(page, 10);
+  const limitNum = parseInt(limit, 10);
+
+  // Create where condition
+  const where = { userId };
+
+  // Add status filter if provided
+  if (
+    status &&
+    ["PENDING", "COMPLETED", "FAILED", "REFUNDED"].includes(status)
+  ) {
+    where.status = status;
+  }
+
+  // Find client profile
+  const client = await prisma.client.findUnique({
+    where: { userId },
+  });
+
+  if (!client) {
+    res.status(400);
+    throw new Error("Client profile not found");
+  }
+
+  // Get payments with pagination
+  const payments = await prisma.payment.findMany({
+    where,
+    include: {
+      booking: {
+        include: {
+          service: {
+            select: {
+              name: true,
+              price: true,
+              vendor: {
+                select: {
+                  businessName: true,
+                  id: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    skip: (pageNum - 1) * limitNum,
+    take: limitNum,
+  });
+
+  // Get total count for pagination
+  const totalPayments = await prisma.payment.count({ where });
+
+  // Format response
+  const formattedPayments = payments.map((payment) => ({
+    id: payment.id,
+    amount: payment.amount,
+    status: payment.status,
+    method: payment.method,
+    transactionId: payment.transactionId,
+    createdAt: payment.createdAt,
+    updatedAt: payment.updatedAt,
+    booking: payment.booking
+      ? {
+          id: payment.booking.id,
+          eventDate: payment.booking.eventDate,
+          location: payment.booking.location,
+          status: payment.booking.status,
+          service: {
+            name: payment.booking.service.name,
+            price: payment.booking.service.price,
+            vendor: {
+              businessName: payment.booking.service.vendor.businessName,
+              id: payment.booking.service.vendor.id,
+            },
+          },
+        }
+      : null,
+  }));
+
+  res.status(200).json({
+    payments: formattedPayments,
+    pagination: {
+      total: totalPayments,
+      page: pageNum,
+      limit: limitNum,
+      pages: Math.ceil(totalPayments / limitNum),
+    },
+  });
+});
+
+module.exports = {
+  initiatePayment,
+  verifyPayment,
+  handleWebhook,
+  getPayments,
+};
