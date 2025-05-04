@@ -1,229 +1,229 @@
 const asyncHandler = require("express-async-handler");
 const prisma = require("../../prisma/client");
+const bcrypt = require("bcryptjs");
 
-// Edit Client Details
-const editClient = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const { email, firstName, lastName, phone } = req.body;
-
-  // Validate input
-  if (!email && !firstName && !lastName && !phone) {
-    res.status(400);
-    throw new Error(
-      "At least one field (email, firstName, lastName, phone) must be provided to update"
-    );
-  }
-
-  // Check if user exists and is a client
-  const user = await prisma.user.findUnique({ where: { id } });
-  if (!user) {
-    res.status(404);
-    throw new Error("User not found");
-  }
-
-  if (user.role !== "CLIENT") {
-    res.status(400);
-    throw new Error("User is not a client");
-  }
-
-  // Prepare update data
-  const updateData = {};
-  if (email) updateData.email = email;
-  if (firstName) updateData.firstName = firstName;
-  if (lastName) updateData.lastName = lastName;
-  if (phone) updateData.phone = phone;
-
-  // Update client details
-  const updatedUser = await prisma.user.update({
-    where: { id },
-    data: updateData,
-  });
-
-  res.status(200).json({
-    message: "Client updated successfully",
-    user: {
-      id: updatedUser.id,
-      email: updatedUser.email,
-      firstName: updatedUser.firstName,
-      lastName: updatedUser.lastName,
-      phone: updatedUser.phone,
-      role: updatedUser.role,
-      isBlocked: updatedUser.isBlocked,
-    },
-  });
-});
-
-// Block or Unblock Client
-const blockClient = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const { isBlocked } = req.body; // true to block, false to unblock
-
-  if (typeof isBlocked !== "boolean") {
-    res.status(400);
-    throw new Error("isBlocked must be a boolean value");
-  }
-
-  // Check if user exists and is a client
-  const user = await prisma.user.findUnique({ where: { id } });
-  if (!user) {
-    res.status(404);
-    throw new Error("User not found");
-  }
-
-  if (user.role !== "CLIENT") {
-    res.status(400);
-    throw new Error("User is not a client");
-  }
-
-  // Update block status
-  const updatedUser = await prisma.user.update({
-    where: { id },
-    data: { isBlocked },
-  });
-
-  res.status(200).json({
-    message: `Client ${isBlocked ? "blocked" : "unblocked"} successfully`,
-    user: {
-      id: updatedUser.id,
-      email: updatedUser.email,
-      firstName: updatedUser.firstName,
-      lastName: updatedUser.lastName,
-      role: updatedUser.role,
-      isBlocked: updatedUser.isBlocked,
-    },
-  });
-});
-
-// Report or Unreport Client
-const reportClient = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const { isReported } = req.body; // true to report, false to unreport
-
-  if (typeof isReported !== "boolean") {
-    res.status(400);
-    throw new Error("isReported must be a boolean value");
-  }
-
-  // Check if user exists and is a client
-  const user = await prisma.user.findUnique({ where: { id } });
-  if (!user) {
-    res.status(404);
-    throw new Error("User not found");
-  }
-
-  if (user.role !== "CLIENT") {
-    res.status(400);
-    throw new Error("User is not a client");
-  }
-
-  // Update report status
-  const updatedUser = await prisma.user.update({
-    where: { id },
-    data: { isReported },
-  });
-
-  res.status(200).json({
-    message: `Client ${isReported ? "reported" : "unreported"} successfully`,
-    user: {
-      id: updatedUser.id,
-      email: updatedUser.email,
-      firstName: updatedUser.firstName,
-      lastName: updatedUser.lastName,
-      role: updatedUser.role,
-      isReported: updatedUser.isReported,
-    },
-  });
-});
-
-// View Client Orders and Profile
-const viewClientDetails = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-
-  // Fetch user with client profile and bookings
-  const user = await prisma.user.findUnique({
-    where: { id },
+// Get all clients
+const getClients = asyncHandler(async (req, res) => {
+  const clients = await prisma.client.findMany({
     include: {
-      clientProfile: {
-        include: {
-          bookings: {
-            select: {
-              id: true,
-              eventDate: true,
-              location: true,
-              status: true,
-              attendees: true,
-              specialRequests: true,
-              service: { select: { name: true, price: true, category: true } },
-            },
-          },
+      user: {
+        select: {
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          createdAt: true,
+          isBlocked: true,
         },
       },
     },
   });
 
-  if (!user) {
-    res.status(404);
-    throw new Error("User not found");
-  }
+  const formattedClients = clients.map(client => ({
+    id: client.id,
+    name: `${client.user.firstName} ${client.user.lastName}`,
+    email: client.user.email,
+    phone: client.user.phone,
+    createdAt: client.user.createdAt,
+    isActive: !client.user.isBlocked,
+  }));
 
-  if (user.role !== "CLIENT") {
-    res.status(400);
-    throw new Error("User is not a client");
-  }
-
-  // Prepare response
-  const profile = user.clientProfile
-    ? {
-        id: user.clientProfile.id,
-        type: "Client",
-      }
-    : null;
-
-  res.status(200).json({
-    user: {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-      phone: user.phone,
-      avatar: user.avatar,
-      status: user.status,
-      isBlocked: user.isBlocked,
-      isReported: user.isReported,
-      createdAt: user.createdAt,
-    },
-    profile,
-    bookings: user.clientProfile?.bookings || [],
-  });
+  res.status(200).json(formattedClients);
 });
+
+// Get client by ID
+const getClientById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const client = await prisma.client.findUnique({
+    where: { id },
+    include: {
+      user: {
+        select: {
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          createdAt: true,
+          isBlocked: true,
+        },
+      },
+    },
+  });
+
+  if (!client) {
+    res.status(404);
+    throw new Error('Client not found');
+  }
+
+  const formattedClient = {
+    id: client.id,
+    name: `${client.user.firstName} ${client.user.lastName}`,
+    email: client.user.email,
+    phone: client.user.phone,
+    createdAt: client.user.createdAt,
+    isActive: !client.user.isBlocked,
+  };
+
+  res.status(200).json(formattedClient);
+});
+
+// Create new client
+const createClient = asyncHandler(async (req, res) => {
+  const { email, password, firstName, lastName, phone } = req.body;
+
+  // Check if user already exists
+  const userExists = await prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (userExists) {
+    res.status(400);
+    throw new Error('User already exists');
+  }
+
+  // Hash password
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  // Create user and client
+  const newUser = await prisma.user.create({
+    data: {
+      email,
+      password: hashedPassword,
+      firstName,
+      lastName,
+      phone,
+      role: 'CLIENT',
+    },
+  });
+
+  const newClient = await prisma.client.create({
+    data: {
+      userId: newUser.id,
+    },
+    include: {
+      user: {
+        select: {
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          createdAt: true,
+        },
+      },
+    },
+  });
+
+  const formattedClient = {
+    id: newClient.id,
+    name: `${newClient.user.firstName} ${newClient.user.lastName}`,
+    email: newClient.user.email,
+    phone: newClient.user.phone,
+    createdAt: newClient.user.createdAt,
+    isActive: true,
+  };
+
+  res.status(201).json(formattedClient);
+});
+
+// Update client
+const updateClient = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { firstName, lastName, phone, isActive } = req.body;
+
+  const client = await prisma.client.findUnique({
+    where: { id },
+    include: {
+      user: true,
+    },
+  });
+
+  if (!client) {
+    res.status(404);
+    throw new Error('Client not found');
+  }
+
+  // Update user
+  const updatedUser = await prisma.user.update({
+    where: { id: client.userId },
+    data: {
+      firstName,
+      lastName,
+      phone,
+      isBlocked: !isActive,
+    },
+  });
+
+  const formattedClient = {
+    id: client.id,
+    name: `${updatedUser.firstName} ${updatedUser.lastName}`,
+    email: updatedUser.email,
+    phone: updatedUser.phone,
+    createdAt: updatedUser.createdAt,
+    isActive: !updatedUser.isBlocked,
+  };
+
+  res.status(200).json(formattedClient);
+});
+
+// Delete client
 const deleteClient = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  // Check if user exists and is a client
-  const user = await prisma.user.findUnique({ where: { id } });
-  if (!user) {
-    res.status(404);
-    throw new Error("User not found");
-  }
-
-  if (user.role !== "CLIENT") {
-    res.status(400);
-    throw new Error("User is not a client");
-  }
-
-  // Delete client
-  await prisma.user.delete({ where: { id } });
-
-  res.status(200).json({
-    message: "Client deleted successfully",
+  const client = await prisma.client.findUnique({
+    where: { id },
+    include: {
+      user: true,
+    },
   });
+
+  if (!client) {
+    res.status(404);
+    throw new Error('Client not found');
+  }
+
+  // Delete client and user (cascade)
+  await prisma.user.delete({
+    where: { id: client.userId },
+  });
+
+  res.status(200).json({ message: 'Client deleted successfully' });
+});
+
+// Update client password
+const updateClientPassword = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { password } = req.body;
+
+  const client = await prisma.client.findUnique({
+    where: { id },
+    include: {
+      user: true,
+    },
+  });
+
+  if (!client) {
+    res.status(404);
+    throw new Error('Client not found');
+  }
+
+  // Hash new password
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  // Update password
+  await prisma.user.update({
+    where: { id: client.userId },
+    data: { password: hashedPassword },
+  });
+
+  res.status(200).json({ message: 'Password updated successfully' });
 });
 
 module.exports = {
+  getClients,
+  getClientById,
+  createClient,
+  updateClient,
   deleteClient,
-  editClient,
-  blockClient,
-  reportClient,
-  viewClientDetails,
+  updateClientPassword,
 };

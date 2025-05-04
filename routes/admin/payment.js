@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   getPaymentInsights,
   getPaymentReport,
+  getPayments,
 } = require("../../controllers/admin/payment");
 const { checkRole } = require("../../middleware/authMiddleware");
 
@@ -12,7 +13,10 @@ router.use(checkRole("ADMIN"));
 // Payment Insights for Admin Dashboard
 router.get("/insights", getPaymentInsights);
 
-// Detailed Payment Report with Filters
+// Payment Report with filters
 router.get("/report", getPaymentReport);
+
+// Get payments in frontend format
+router.get("/", getPayments);
 
 module.exports = router;

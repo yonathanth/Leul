@@ -1,53 +1,49 @@
 const asyncHandler = require("express-async-handler");
 const prisma = require("../../prisma/client");
+const bcrypt = require("bcryptjs");
 
 //edit event planner details
 const editEventPlanner = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { email, firstName, lastName } = req.body;
+  const { email, name, phone, isBlocked } = req.body;
 
-  // Validate input
-  if (!email && !firstName && !lastName) {
-    res.status(400);
-    throw new Error(
-      "At least one field (email, firstName, lastName) must be provided to update"
-    );
-  }
-
-  // Check if user exists and is an event planner
-  const user = await prisma.user.findUnique({ where: { id } });
-  if (!user) {
-    res.status(404);
-    throw new Error("User not found");
-  }
-
-  if (user.role !== "EVENT_PLANNER") {
-    res.status(400);
-    throw new Error("User is not an event planner");
-  }
-
-  // Prepare update data
-  const updateData = {};
-  if (email) updateData.email = email;
-  if (firstName) updateData.firstName = firstName;
-  if (lastName) updateData.lastName = lastName;
-
-  // Update event planner details
-  const updatedUser = await prisma.user.update({
+  // Check if event planner exists
+  const eventPlanner = await prisma.eventPlanner.findUnique({ 
     where: { id },
-    data: updateData,
+    include: {
+      user: true
+    }
+  });
+  
+  if (!eventPlanner) {
+    res.status(404);
+    throw new Error("Event Planner not found");
+  }
+
+  // Split name into first and last name
+  const [firstName, ...lastNameParts] = name.split(' ');
+  const lastName = lastNameParts.join(' ');
+
+  // Update user details
+  const updatedUser = await prisma.user.update({
+    where: { id: eventPlanner.userId },
+    data: {
+      email,
+      firstName,
+      lastName,
+      phone,
+      isBlocked,
+    },
   });
 
   res.status(200).json({
-    message: "Event Planner updated successfully",
-    user: {
-      id: updatedUser.id,
-      email: updatedUser.email,
-      firstName: updatedUser.firstName,
-      lastName: updatedUser.lastName,
-      role: updatedUser.role,
-      isBlocked: updatedUser.isBlocked,
-    },
+    id: eventPlanner.id,
+    email: updatedUser.email,
+    name: `${updatedUser.firstName} ${updatedUser.lastName}`,
+    phone: updatedUser.phone,
+    avatar: updatedUser.avatar,
+    isBlocked: updatedUser.isBlocked,
+    createdAt: updatedUser.createdAt
   });
 });
 
@@ -70,7 +66,175 @@ const removeEventPlanner = asyncHandler(async (req, res) => {
 
 // View Event Planner Performance
 
+// Get all event planners
+const getEventPlanners = asyncHandler(async (req, res) => {
+  const eventPlanners = await prisma.eventPlanner.findMany({
+    include: {
+      user: {
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          avatar: true,
+          isBlocked: true,
+          createdAt: true,
+        },
+      },
+    },
+    orderBy: {
+      user: {
+        createdAt: 'desc'
+      }
+    }
+  });
+
+  // Format the response
+  const formattedEventPlanners = eventPlanners.map(planner => ({
+    id: planner.id,
+    userId: planner.userId,
+    companyName: planner.companyName,
+    bio: planner.bio,
+    email: planner.user.email,
+    name: `${planner.user.firstName} ${planner.user.lastName}`,
+    phone: planner.user.phone,
+    avatar: planner.user.avatar,
+    isBlocked: planner.user.isBlocked,
+    createdAt: planner.user.createdAt
+  }));
+
+  res.status(200).json(formattedEventPlanners);
+});
+
+// Get event planner by ID
+const getEventPlannerById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  // Find event planner with user details
+  const eventPlanner = await prisma.eventPlanner.findUnique({
+    where: { id },
+    include: {
+      user: {
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          avatar: true,
+          isBlocked: true,
+          createdAt: true,
+        },
+      },
+    },
+  });
+
+  if (!eventPlanner) {
+    res.status(404);
+    throw new Error("Event Planner not found");
+  }
+
+  // Format the response
+  const formattedEventPlanner = {
+    id: eventPlanner.id,
+    email: eventPlanner.user.email,
+    name: `${eventPlanner.user.firstName} ${eventPlanner.user.lastName}`,
+    phone: eventPlanner.user.phone,
+    avatar: eventPlanner.user.avatar,
+    isBlocked: eventPlanner.user.isBlocked,
+    createdAt: eventPlanner.user.createdAt,
+  };
+
+  res.status(200).json(formattedEventPlanner);
+});
+
+// Create new event planner
+const createEventPlanner = asyncHandler(async (req, res) => {
+  try {
+    const {
+      name,
+      email,
+      password,
+      phone,
+    } = req.body;
+
+    // Validate required fields
+    if (!email || !password || !name) {
+      res.status(400);
+      throw new Error("Email, password, and name are required");
+    }
+
+    // Check if user already exists
+    const userExists = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (userExists) {
+      res.status(400);
+      throw new Error("User with this email already exists");
+    }
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create user first
+    const user = await prisma.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        firstName: name,
+        lastName: "",
+        phone: phone || null,
+        role: "EVENT_PLANNER",
+      },
+    });
+
+    // Then create event planner
+    const eventPlanner = await prisma.eventPlanner.create({
+      data: {
+        userId: user.id,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            avatar: true,
+            isBlocked: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    // Format the response
+    const formattedEventPlanner = {
+      id: eventPlanner.id,
+      userId: eventPlanner.userId,
+      email: eventPlanner.user.email,
+      name: eventPlanner.user.firstName,
+      phone: eventPlanner.user.phone,
+      avatar: eventPlanner.user.avatar,
+      isBlocked: eventPlanner.user.isBlocked,
+      createdAt: eventPlanner.user.createdAt,
+    };
+
+    res.status(201).json(formattedEventPlanner);
+  } catch (error) {
+    console.error("Error creating event planner:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = {
+  getEventPlanners,
+  createEventPlanner,
   editEventPlanner,
   removeEventPlanner,
+  getEventPlannerById,
 };

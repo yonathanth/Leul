@@ -217,4 +217,47 @@ const getPaymentReport = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { getPaymentInsights, getPaymentReport };
+// Get payments in frontend format
+const getPayments = asyncHandler(async (req, res) => {
+  const payments = await prisma.payment.findMany({
+    select: {
+      id: true,
+      amount: true,
+      status: true,
+      method: true,
+      createdAt: true,
+      user: {
+        select: {
+          firstName: true,
+          lastName: true,
+        },
+      },
+      booking: {
+        select: {
+          service: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+
+  const formattedPayments = payments.map(payment => ({
+    id: payment.id,
+    userName: `${payment.user.firstName} ${payment.user.lastName}`,
+    amount: payment.amount,
+    date: payment.createdAt,
+    status: payment.status,
+    method: payment.method,
+    eventName: payment.booking?.service?.name || 'N/A',
+  }));
+
+  res.status(200).json(formattedPayments);
+});
+
+module.exports = { getPaymentInsights, getPaymentReport, getPayments };
