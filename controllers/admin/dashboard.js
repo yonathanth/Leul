@@ -10,7 +10,58 @@ const getOverview = asyncHandler(async (req, res) => {
     where: { status: { in: ["PENDING", "CONFIRMED"] } },
   });
   const totalPayments = await prisma.payment.count();
-  const totalFeedback = await prisma.feedback.count();
+
+  // Get 5 most recent payments
+  const recentPayments = await prisma.payment.findMany({
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: 5,
+    include: {
+      user: {
+        select: {
+          firstName: true,
+          lastName: true,
+          email: true,
+        },
+      },
+      recipient: {
+        select: {
+          firstName: true,
+          lastName: true,
+          email: true,
+        },
+      },
+    },
+  });
+
+  // Get 5 most recent feedbacks
+  const recentFeedbacks = await prisma.feedback.findMany({
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: 5,
+    include: {
+      fromUser: {
+        select: {
+          firstName: true,
+          lastName: true,
+        },
+      },
+      toUser: {
+        select: {
+          firstName: true,
+          lastName: true,
+        },
+      },
+      booking: {
+        select: {
+          id: true,
+          status: true,
+        },
+      },
+    },
+  });
 
   res.status(200).json({
     totalUsers,
@@ -18,7 +69,8 @@ const getOverview = asyncHandler(async (req, res) => {
     totalEventPlanners,
     totalActiveBookings,
     totalPayments,
-    totalFeedback,
+    recentPayments,
+    recentFeedbacks,
   });
 });
 

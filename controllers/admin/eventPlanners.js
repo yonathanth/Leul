@@ -1,6 +1,30 @@
 const asyncHandler = require("express-async-handler");
 const prisma = require("../../prisma/client");
 
+// Get all event planners
+const getAllEventPlanners = asyncHandler(async (req, res) => {
+  const eventPlanners = await prisma.eventPlanner.findMany({
+    include: {
+      user: {
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          avatar: true,
+          isBlocked: true,
+          createdAt: true,
+          updatedAt: true,
+          isOnline: true,
+        },
+      },
+    },
+  });
+
+  res.status(200).json(eventPlanners);
+});
+
 //edit event planner details
 const editEventPlanner = asyncHandler(async (req, res) => {
   const { id } = req.params;
@@ -73,4 +97,5 @@ const removeEventPlanner = asyncHandler(async (req, res) => {
 module.exports = {
   editEventPlanner,
   removeEventPlanner,
+  getAllEventPlanners,
 };

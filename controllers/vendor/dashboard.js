@@ -6,6 +6,9 @@ const getDashboardOverview = asyncHandler(async (req, res) => {
   // Fetch the vendor record using the user ID from the decoded token
   const vendor = await prisma.vendor.findUnique({
     where: { userId: req.user.id },
+    include: {
+      services: true,
+    },
   });
 
   if (!vendor) {
@@ -13,32 +16,78 @@ const getDashboardOverview = asyncHandler(async (req, res) => {
     throw new Error("Vendor profile not found");
   }
 
-  const vendorId = vendor.id; // Get the vendorId from the Vendor record
+  const vendorId = vendor.id;
+  const serviceIds = vendor.services.map((service) => service.id);
 
-  // Fetch total bookings (all bookings assigned to the vendor via AssignedVendor)
-  const totalBookings = await prisma.assignedVendor.count({
+  // Get all bookings for this vendor's services
+  const bookingsData = await prisma.booking.findMany({
     where: {
-      vendorId,
+      serviceId: {
+        in: serviceIds,
+      },
+    },
+    include: {
+      service: {
+        select: {
+          name: true,
+          price: true,
+        },
+      },
+      client: {
+        include: {
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+            },
+          },
+        },
+      },
     },
   });
 
-  // Fetch pending confirmations (bookings with status PENDING)
-  const pendingConfirmations = await prisma.assignedVendor.count({
-    where: {
-      vendorId,
-      status: "PENDING",
+  // Get pending bookings
+  const pendingBookings = bookingsData.filter(
+    (booking) => booking.status === "PENDING"
+  );
+
+  // Get confirmed bookings
+  const confirmedBookings = bookingsData.filter(
+    (booking) => booking.status === "CONFIRMED"
+  );
+
+  // Get completed bookings
+  const completedBookings = bookingsData.filter(
+    (booking) => booking.status === "COMPLETED"
+  );
+
+  // Format booking data
+  const formatBookingData = (booking) => ({
+    id: booking.id,
+    status: booking.status,
+    eventDate: booking.eventDate,
+    location: booking.location,
+    attendees: booking.attendees,
+    specialRequests: booking.specialRequests,
+    createdAt: booking.createdAt,
+    service: {
+      name: booking.service.name,
+      price: booking.service.price,
+    },
+    client: {
+      name: `${booking.client.user.firstName} ${booking.client.user.lastName}`,
+      email: booking.client.user.email,
+      phone: booking.client.user.phone,
     },
   });
 
-  // Fetch revenue stats (total revenue from completed payments)
+  // Fetch revenue data (payments)
   const payments = await prisma.payment.findMany({
     where: {
       vendorId,
       status: "COMPLETED",
-    },
-    select: {
-      amount: true,
-      createdAt: true,
     },
   });
 
@@ -48,30 +97,68 @@ const getDashboardOverview = asyncHandler(async (req, res) => {
     0
   );
 
-  // Calculate monthly revenue breakdown
+  // Monthly revenue breakdown
   const revenueBreakdown = payments.reduce((acc, payment) => {
     const month = payment.createdAt.toISOString().slice(0, 7); // Format: YYYY-MM
     acc[month] = (acc[month] || 0) + payment.amount;
     return acc;
   }, {});
 
-  const revenueStats = {
-    totalRevenue,
-    currency: "USD", // Assuming USD, can be dynamic based on your needs
-    breakdown: Object.entries(revenueBreakdown).map(([month, revenue]) => ({
-      month,
-      revenue,
-    })),
-  };
+  // Get vendor rating (from the vendor object)
+  const rating = vendor.rating || 0;
+
+  // Get number of chats created today
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const chatsToday = await prisma.conversation.count({
+    where: {
+      participants: {
+        some: {
+          id: req.user.id,
+        },
+      },
+      createdAt: {
+        gte: today,
+      },
+    },
+  });
 
   // Respond with the dashboard overview data
   res.status(200).json({
     success: true,
     data: {
       vendorId,
-      totalBookings,
-      pendingConfirmations,
-      revenueStats,
+      businessName: vendor.businessName,
+      serviceType: vendor.serviceType,
+      rating,
+      totalBookings: bookingsData.length,
+      pendingBookings: {
+        count: pendingBookings.length,
+        data: pendingBookings.map(formatBookingData),
+      },
+      confirmedBookings: {
+        count: confirmedBookings.length,
+        data: confirmedBookings.map(formatBookingData),
+      },
+      completedBookings: {
+        count: completedBookings.length,
+        data: completedBookings.map(formatBookingData),
+      },
+      allBookings: {
+        count: bookingsData.length,
+        data: bookingsData.map(formatBookingData),
+      },
+      revenue: {
+        total: totalRevenue,
+        currency: "ETB", // Ethiopian Birr
+        breakdown: Object.entries(revenueBreakdown).map(([month, amount]) => ({
+          month,
+          amount,
+        })),
+      },
+      chatsToday,
+      servicesCount: vendor.services.length,
     },
   });
 });

@@ -88,7 +88,6 @@ const register = async (req, res) => {
       const eventPlanner = await prisma.eventPlanner.create({
         data: {
           userId: newUser.id,
-          companyName: companyName || null,
           bio: bio || null,
         },
       });

@@ -121,6 +121,99 @@ const editVendorAccount = asyncHandler(async (req, res) => {
   });
 });
 
+// Get Vendor Profile
+const getVendorProfile = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+
+  // Get user with vendor profile
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      vendorProfile: true,
+    },
+  });
+
+  if (!user) {
+    res.status(404);
+    throw new Error("User not found");
+  }
+
+  // Get booking statistics
+  const bookingStats = await prisma.booking.groupBy({
+    by: ["status"],
+    where: {
+      service: {
+        vendorId: user.vendorProfile.id,
+      },
+    },
+    _count: {
+      _all: true,
+    },
+  });
+
+  const totalBookings = bookingStats.reduce(
+    (sum, stat) => sum + stat._count._all,
+    0
+  );
+
+  // Format the booking stats into an object
+  const bookingCounts = {};
+  bookingStats.forEach((stat) => {
+    bookingCounts[stat.status] = stat._count._all;
+  });
+
+  // Get payment statistics
+  const paymentStats = await prisma.payment.aggregate({
+    where: {
+      vendorId: user.vendorProfile.id,
+      status: "COMPLETED",
+    },
+    _count: {
+      _all: true,
+    },
+    _sum: {
+      amount: true,
+    },
+  });
+
+  // Get services count
+  const servicesCount = await prisma.service.count({
+    where: {
+      vendorId: user.vendorProfile.id,
+    },
+  });
+
+  // Format response
+  res.status(200).json({
+    profile: {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phone: user.phone || null,
+      avatar: user.avatar || null,
+      role: user.role,
+      createdAt: user.createdAt,
+      vendorDetails: {
+        id: user.vendorProfile.id,
+        businessName: user.vendorProfile.businessName,
+        description: user.vendorProfile.description,
+        serviceType: user.vendorProfile.serviceType,
+      },
+    },
+    stats: {
+      totalBookings,
+      bookings: bookingCounts,
+      services: servicesCount,
+      payments: {
+        count: paymentStats._count._all,
+        totalAmount: paymentStats._sum.amount || 0,
+      },
+    },
+  });
+});
+
 module.exports = {
   editVendorAccount,
+  getVendorProfile,
 };

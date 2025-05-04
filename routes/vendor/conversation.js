@@ -7,7 +7,7 @@ const {
 } = require("../../controllers/vendor/conversation");
 
 // Start a new conversation with a client
-router.post("/conversation", checkRole(["VENDOR"]), startConversation);
+router.post("/conversations", checkRole(["VENDOR"]), startConversation);
 
 // Get all conversations for the vendor
 router.get("/conversations", checkRole(["VENDOR"]), getVendorConversations);

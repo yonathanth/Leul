@@ -164,6 +164,7 @@ const viewVendorListings = asyncHandler(async (req, res) => {
   // Format response
   const vendorListings = vendors.map((vendor) => ({
     id: vendor.id,
+    userId: vendor.userId,
     businessName: vendor.businessName,
     email: vendor.user.email,
     firstName: vendor.user.firstName,

@@ -16,7 +16,7 @@ const addService = asyncHandler(async (req, res) => {
   const vendorId = vendor.id;
 
   // Extract service details from the request body
-  const { title, description, price, category, availability } = req.body;
+  const { title, description, price, category } = req.body;
 
   // Validate required fields
   if (!title || !price || !category) {
@@ -28,31 +28,6 @@ const addService = asyncHandler(async (req, res) => {
   if (typeof price !== "number" || price <= 0) {
     res.status(400);
     throw new Error("Price must be a positive number");
-  }
-
-  // Validate availability (if provided)
-  let availabilityData = {};
-  if (availability) {
-    const { startDate, endDate } = availability;
-    if (!startDate || !endDate) {
-      res.status(400);
-      throw new Error("Availability must include startDate and endDate");
-    }
-
-    // Validate date format
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      res.status(400);
-      throw new Error("Invalid date format for startDate or endDate");
-    }
-
-    if (start >= end) {
-      res.status(400);
-      throw new Error("startDate must be before endDate");
-    }
-
-    availabilityData = { startDate, endDate };
   }
 
   // Create the new service
@@ -75,7 +50,6 @@ const addService = asyncHandler(async (req, res) => {
       description: newService.description,
       price: newService.price,
       category: newService.category,
-      availability: availabilityData,
       createdAt: newService.createdAt,
     },
   });
@@ -184,7 +158,6 @@ const updateService = asyncHandler(async (req, res) => {
       description: updatedService.description,
       price: updatedService.price,
       category: updatedService.category,
-      availability: {}, // Placeholder; can fetch from Availability model if needed
       updatedAt: updatedService.updatedAt,
     },
   });

@@ -109,6 +109,7 @@ app.use("/api/vendor", require("./routes/vendor/conversation"));
 app.use("/api/vendor/dashboard", require("./routes/vendor/dashboard"));
 app.use("/api/vendor/payment", require("./routes/vendor/payment"));
 app.use("/api/vendor/services", require("./routes/vendor/services"));
+app.use("/api/vendor/bookings", require("./routes/vendor/bookings"));
 
 // Admin Routes
 app.use("/api/admin/clients", require("./routes/admin/client"));
