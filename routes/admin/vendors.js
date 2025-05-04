@@ -6,11 +6,15 @@ const {
   deleteVendor,
   suspendVendor,
   viewVendorListings,
+  getVendorById,
 } = require("../../controllers/admin/vendors");
 const { checkRole } = require("../../middleware/authMiddleware");
 
 // Middleware to ensure only ADMIN can access these routes
 router.use(checkRole(["ADMIN", "EVENT_PLANNER"]));
+
+// Get vendor by ID
+router.get("/:id", getVendorById);
 
 // Edit Vendor
 router.patch("/:id", editVendor);

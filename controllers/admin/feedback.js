@@ -197,7 +197,68 @@ const reviewRatings = asyncHandler(async (req, res) => {
   });
 });
 
+// Get feedback in frontend format
+const getFeedback = asyncHandler(async (req, res) => {
+  const feedbacks = await prisma.feedback.findMany({
+    include: {
+      fromUser: {
+        select: {
+          firstName: true,
+          lastName: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+
+  const formattedFeedbacks = feedbacks.map(feedback => ({
+    id: feedback.id,
+    userName: `${feedback.fromUser.firstName} ${feedback.fromUser.lastName}`,
+    rating: feedback.rating,
+    comment: feedback.comment,
+    date: feedback.createdAt,
+  }));
+
+  res.status(200).json(formattedFeedbacks);
+});
+
+// Get single feedback by ID
+const getFeedbackById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const feedback = await prisma.feedback.findUnique({
+    where: { id },
+    include: {
+      fromUser: {
+        select: {
+          firstName: true,
+          lastName: true,
+        },
+      },
+    },
+  });
+
+  if (!feedback) {
+    res.status(404);
+    throw new Error('Feedback not found');
+  }
+
+  const formattedFeedback = {
+    id: feedback.id,
+    userName: `${feedback.fromUser.firstName} ${feedback.fromUser.lastName}`,
+    rating: feedback.rating,
+    comment: feedback.comment,
+    date: feedback.createdAt,
+  };
+
+  res.status(200).json(formattedFeedback);
+});
+
 module.exports = {
   reviewComplaints,
   reviewRatings,
+  getFeedback,
+  getFeedbackById,
 };
