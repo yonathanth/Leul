@@ -10,6 +10,7 @@ const chapa = axios.create({
     Authorization: `Bearer ${CHAPA_SECRET_KEY}`,
     "Content-Type": "application/json",
   },
+  timeout: 10000, // Added timeout to prevent hanging requests
 });
 
 // Create subaccount for admin (run this once)
@@ -26,7 +27,7 @@ const createAdminSubaccount = async () => {
         bank_code: "946", // Zemen Bank
         account_number: "1000000000", // Test account for Zemen Bank
         split_type: "percentage",
-        split_value: 10, // 10% for platform fee
+        split_value: "0.1", // 10% as decimal string (fixed)
       });
 
       await prisma.chapaSubaccount.create({
@@ -66,16 +67,16 @@ const createVendorSubaccount = async (vendorId) => {
       throw new Error(`Vendor with ID ${vendorId} not found`);
     }
 
-    // Define default bank codes for Ethiopia
-    const bankCodes = {
-      CBE: "961", // Commercial Bank of Ethiopia
-      DASHEN: "945", // Dashen Bank
-      AWASH: "942", // Awash Bank
-      ZEMEN: "946", // Zemen Bank
+    // Define default bank codes and required account number lengths
+    const bankDetails = {
+      CBE: { code: "946", length: 13, testAccount: "1000474468444" }, // Commercial Bank of Ethiopia
+      DASHEN: { code: "945", length: 10, testAccount: "1000000000" }, // Dashen Bank
+      AWASH: { code: "942", length: 10, testAccount: "1000000000" }, // Awash Bank
+      ZEMEN: { code: "946", length: 10, testAccount: "1000000000" }, // Zemen Bank
     };
 
-    // Determine bank code from vendor's bank name or use Zemen Bank as default
-    let bankCode = "946"; // Default to Zemen Bank
+    // Determine bank details from vendor's bank name or use Zemen Bank as default
+    let bankInfo = bankDetails.CBE; // Default to Zemen Bank
 
     if (vendor.bankName) {
       const bankNameUppercase = vendor.bankName.toUpperCase();
@@ -84,31 +85,48 @@ const createVendorSubaccount = async (vendorId) => {
         bankNameUppercase.includes("CBE") ||
         bankNameUppercase.includes("COMMERCIAL")
       ) {
-        bankCode = bankCodes.CBE;
+        bankInfo = bankDetails.CBE;
       } else if (bankNameUppercase.includes("DASHEN")) {
-        bankCode = bankCodes.DASHEN;
+        bankInfo = bankDetails.DASHEN;
       } else if (bankNameUppercase.includes("AWASH")) {
-        bankCode = bankCodes.AWASH;
+        bankInfo = bankDetails.AWASH;
       } else if (bankNameUppercase.includes("ZEMEN")) {
-        bankCode = bankCodes.ZEMEN;
+        bankInfo = bankDetails.ZEMEN;
       }
     }
 
-    // Use vendor's bank account number or generate a valid test account number
-    // In production, this should ALWAYS be the vendor's real account number
-    const accountNumber =
-      vendor.bankAccountNumber ||
-      (bankCode === "961" ? "1000000000000" : "1000000000");
+    // Validate or generate account number
+    let accountNumber = vendor.bankAccountNumber || bankInfo.testAccount;
+
+    // Ensure account number has correct length for the bank
+    if (accountNumber.length !== bankInfo.length) {
+      console.warn(
+        `Account number length doesn't match bank requirements. Using test account.`
+      );
+      accountNumber = bankInfo.testAccount;
+    }
+
+    // Ensure account number contains only digits
+    if (!/^\d+$/.test(accountNumber)) {
+      console.warn(
+        `Account number contains non-digit characters. Using test account.`
+      );
+      accountNumber = bankInfo.testAccount;
+    }
+
+    console.log(
+      `Using bank code: ${bankInfo.code}, account number: ${accountNumber}`
+    );
 
     const response = await chapa.post("/subaccount", {
       business_name: vendor.businessName,
       account_name:
         `${vendor.firstName || ""} ${vendor.lastName || ""}`.trim() ||
-        vendor.businessName,
-      bank_code: bankCode,
+        "Vendor Account",
+      bank_code: bankInfo.code,
       account_number: accountNumber,
       split_type: "percentage",
-      split_value: 90, // 90% to vendor, 10% to platform
+      split_value: "0.9", // 90% as decimal string
     });
 
     console.log("Chapa subaccount created:", response.data);
@@ -126,8 +144,12 @@ const createVendorSubaccount = async (vendorId) => {
       stack: error.stack,
     });
 
-    // Extract Chapa's error message if available
-    const chapaError = error.response?.data?.message || error.message;
+    // More detailed error extraction
+    const chapaError =
+      error.response?.data?.message ||
+      (error.response?.data?.errors
+        ? Object.values(error.response.data.errors).join(", ")
+        : error.message);
     throw new Error(`Chapa Error: ${chapaError}`);
   }
 };

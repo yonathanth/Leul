@@ -78,8 +78,9 @@ const initiatePayment = asyncHandler(async (req, res) => {
   try {
     const tx_ref = `payment-${payment.id}-${uuid()}`;
 
-    // Production URLs
-    const frontendBaseUrl = "https://weddingplanning-1-joi4.onrender.com";
+    // Get URLs from environment variables with fallbacks
+    const frontendBaseUrl =
+      process.env.FRONTEND_URL || "https://weddingplanning-1-joi4.onrender.com";
     const backendBaseUrl = process.env.BACKEND_URL || "http://localhost:5000";
 
     const response = await chapa.post("/transaction/initialize", {
