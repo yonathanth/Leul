@@ -1,6 +1,38 @@
 const asyncHandler = require("express-async-handler");
 const jwt = require("jsonwebtoken");
 
+// General authentication middleware
+const authenticate = asyncHandler(async (req, res, next) => {
+  try {
+    // Get token from header (Authorization: Bearer <token>)
+    const token = req.headers.authorization?.split(" ")[1];
+
+    if (!token) {
+      return res
+        .status(401)
+        .json({ message: "Not authorized, no token provided" });
+    }
+
+    // Verify token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (error) {
+      console.error("Token verification failed:", error.message);
+      return res.status(401).json({ message: "Not authorized, invalid token" });
+    }
+
+    // Attach user to request object
+    req.user = decoded;
+    next();
+  } catch (error) {
+    console.error("Error in auth middleware:", error.message);
+    res
+      .status(401)
+      .json({ message: "Not authorized, token validation failed" });
+  }
+});
+
 const checkRole = (allowedRoles) => {
   return asyncHandler(async (req, res, next) => {
     try {
@@ -60,4 +92,8 @@ const authMiddlewareSocket = (socket, next) => {
   }
 };
 
-module.exports = { checkRole, authMiddlewareSocket };
+module.exports = {
+  authenticate,
+  checkRole,
+  authMiddlewareSocket,
+};

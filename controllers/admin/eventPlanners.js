@@ -20,20 +20,25 @@ const editEventPlanner = asyncHandler(async (req, res) => {
     throw new Error("Event Planner not found");
   }
 
-  // Split name into first and last name
-  const [firstName, ...lastNameParts] = name.split(" ");
-  const lastName = lastNameParts.join(" ");
+  // Prepare update data
+  const updateData = {};
+
+  if (email) updateData.email = email;
+  if (phone) updateData.phone = phone;
+  if (isBlocked !== undefined) updateData.isBlocked = isBlocked;
+
+  // Handle name if provided
+  if (name) {
+    const [firstName, ...lastNameParts] = name.split(" ");
+    const lastName = lastNameParts.join(" ");
+    updateData.firstName = firstName;
+    updateData.lastName = lastName;
+  }
 
   // Update user details
   const updatedUser = await prisma.user.update({
     where: { id: eventPlanner.userId },
-    data: {
-      email,
-      firstName,
-      lastName,
-      phone,
-      isBlocked,
-    },
+    data: updateData,
   });
 
   res.status(200).json({

@@ -48,6 +48,7 @@ model User {
   isBlocked     Boolean     @default(false)
   isReported    Boolean     @default(false)
   isOnline      Boolean     @default(false) // Add for online status
+
   conversations Conversation[] @relation("UserConversations") // Add relation to conversations
 
   // Existing relationships
@@ -98,6 +99,8 @@ model Vendor {
   businessName     String
   description      String?
   serviceType      String
+    accountNumber    Int?
+
   status           VendorStatus @default(PENDING_APPROVAL)
   rating           Float?     @default(0)
   services         Service[]

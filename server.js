@@ -19,7 +19,11 @@ app.use(express.urlencoded({ extended: false }));
 
 // CORS configuration for Express
 const corsOptions = {
-  origin: "http://localhost:5173", // Ensure this matches your frontend URL
+  origin: [
+    "http://localhost:5173",
+    "https://weddingplanning-1-joi4.onrender.com",
+    "http://localhost:8000",
+  ], // Ensure this matches your frontend URL
   methods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
   optionsSuccessStatus: 200,
 };
@@ -30,7 +34,11 @@ app.use("/public", express.static("public"));
 // Set up Socket.IO with CORS
 const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:5173", // Match your frontend URL
+    origin: [
+      "http://localhost:5173",
+      "https://weddingplanning-1-joi4.onrender.com",
+      "http://localhost:8000",
+    ],
     methods: ["GET", "POST"],
   },
 });
@@ -103,6 +111,15 @@ io.on("connection", (socket) => {
 // Auth Routes
 app.use("/api/auth", require("./routes/shared/authRoutes"));
 
+// For debugging purposes, log all requests
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url}`);
+  next();
+});
+
+// User Routes (common for all user types)
+app.use("/api/user", require("./routes/shared/userRoutes"));
+
 // Vendor Routes
 app.use("/api/vendor/account", require("./routes/vendor/account"));
 app.use("/api/vendor", require("./routes/vendor/conversation"));
@@ -118,6 +135,20 @@ app.use("/api/admin/event-planners", require("./routes/admin/eventPlanners"));
 app.use("/api/admin/feedback", require("./routes/admin/feedback"));
 app.use("/api/admin/vendors", require("./routes/admin/vendors"));
 app.use("/api/admin/payments", require("./routes/admin/payment"));
+
+// Event Planner Routes
+app.use(
+  "/api/eventplanner/dashboard",
+  require("./routes/eventplanner/dashboard")
+);
+app.use("/api/eventplanner/vendors", require("./routes/eventplanner/vendors"));
+app.use("/api/eventplanner/clients", require("./routes/eventplanner/clients"));
+app.use(
+  "/api/eventplanner/feedback",
+  require("./routes/eventplanner/feedback")
+);
+app.use("/api/eventplanner/payments", require("./routes/eventplanner/payment"));
+app.use("/api/eventplanner/account", require("./routes/eventplanner/account"));
 
 // Client Routes
 app.use("/api/client/bookings", require("./routes/client/booking"));
@@ -137,6 +168,21 @@ createAdminSubaccount().then(() => {
 
 app.get("/", (req, res) => {
   res.send("Api Up and Running!");
+});
+
+// Handle 404 errors with a custom message
+app.use((req, res, next) => {
+  res.status(404).json({
+    message: `Route not found: ${req.method} ${req.originalUrl}`,
+    availableRoutes: [
+      "/api/auth/*",
+      "/api/user/*",
+      "/api/vendor/*",
+      "/api/admin/*",
+      "/api/eventplanner/*",
+      "/api/client/*",
+    ],
+  });
 });
 
 app.use(errorHandler);

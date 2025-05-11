@@ -77,13 +77,18 @@ const initiatePayment = asyncHandler(async (req, res) => {
   // Create Chapa payment
   try {
     const tx_ref = `payment-${payment.id}-${uuid()}`;
+
+    // Production URLs
+    const frontendBaseUrl = "https://weddingplanning-1-joi4.onrender.com";
+    const backendBaseUrl = process.env.BACKEND_URL || "http://localhost:5000";
+
     const response = await chapa.post("/transaction/initialize", {
       amount: amount.toString(),
       currency: "ETB",
       email: req.user.email,
       tx_ref,
-      callback_url: "http://localhost:5000/api/client/payment/verify", // Local URL for testing
-      return_url: "https://www.google.com", // Local URL for testing
+      callback_url: `${backendBaseUrl}/api/client/payment/verify`,
+      return_url: `${frontendBaseUrl}/dashboard/payment/status?tx_ref=${tx_ref}&payment_id=${payment.id}`,
       split: {
         type: "percentage",
         subaccounts: [
@@ -91,6 +96,12 @@ const initiatePayment = asyncHandler(async (req, res) => {
           { id: vendor.chapaSubaccountId, share: 90 },
         ],
       },
+      // Add customer information
+      first_name: client.firstName || req.user.firstName || "",
+      last_name: client.lastName || req.user.lastName || "",
+      phone_number: client.phoneNumber || "",
+      title: `Payment for ${booking.service.name}`,
+      description: `Wedding service booking payment for ${booking.service.name}`,
     });
 
     // Update payment with transaction ID
@@ -209,11 +220,19 @@ const handleWebhook = asyncHandler(async (req, res) => {
     const chapaSignature = req.headers["chapa-signature"];
     const webhookSecret = process.env.CHAPA_WEBHOOK_SECRET;
 
+    if (!chapaSignature || !webhookSecret) {
+      console.error("Missing signature or webhook secret");
+      return res.status(401).send("Unauthorized");
+    }
+
+    // Create the expected signature using the webhook secret
+    const crypto = require("crypto");
     const hash = crypto
       .createHmac("sha256", webhookSecret)
       .update(JSON.stringify(req.body))
       .digest("hex");
 
+    // Verify the signature
     if (hash !== chapaSignature) {
       console.error("Invalid webhook signature");
       return res.status(401).send("Unauthorized");
@@ -221,23 +240,66 @@ const handleWebhook = asyncHandler(async (req, res) => {
 
     const { tx_ref, status } = req.body;
 
-    const payment = await prisma.payment.update({
+    if (!tx_ref) {
+      console.error("Missing tx_ref in webhook payload");
+      return res.status(400).send("Bad Request: Missing tx_ref");
+    }
+
+    // Get payment by transactionId
+    const payment = await prisma.payment.findFirst({
       where: { transactionId: tx_ref },
-      data: {
-        status: status === "success" ? "COMPLETED" : "FAILED",
-        updatedAt: new Date(),
-      },
-      include: { vendor: true, user: true, booking: true },
+      include: { booking: true },
     });
 
-    if (status === "success" && payment.booking?.status === "PENDING") {
+    if (!payment) {
+      console.error(`Payment not found for tx_ref: ${tx_ref}`);
+      return res.status(404).send("Payment not found");
+    }
+
+    // Map Chapa status to your PaymentStatus enum
+    let paymentStatus;
+    switch (status.toLowerCase()) {
+      case "success":
+        paymentStatus = "COMPLETED";
+        break;
+      case "failed":
+      case "fail":
+        paymentStatus = "FAILED";
+        break;
+      case "pending":
+        paymentStatus = "PENDING";
+        break;
+      default:
+        paymentStatus = "FAILED";
+    }
+
+    // Update payment status
+    const updatedPayment = await prisma.payment.update({
+      where: { id: payment.id },
+      data: {
+        status: paymentStatus,
+        updatedAt: new Date(),
+      },
+      include: { booking: true },
+    });
+
+    // Update booking status if payment is completed
+    if (
+      paymentStatus === "COMPLETED" &&
+      updatedPayment.booking?.status === "PENDING"
+    ) {
       await prisma.booking.update({
-        where: { id: payment.booking.id },
+        where: { id: updatedPayment.booking.id },
         data: { status: "CONFIRMED" },
       });
     }
 
-    res.status(200).send("Webhook processed");
+    // Log successful webhook processing
+    console.log(
+      `Webhook processed for payment ${payment.id}, status updated to ${paymentStatus}`
+    );
+
+    res.status(200).send("Webhook processed successfully");
   } catch (error) {
     console.error("Webhook processing error:", error);
     res.status(500).send("Webhook processing failed");

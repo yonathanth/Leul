@@ -23,7 +23,7 @@ router.get("/:id", getClientById);
 router.post("/", createClient);
 
 // Update client
-router.put("/:id", updateClient);
+router.patch("/:id", updateClient);
 
 // Delete client
 router.delete("/:id", deleteClient);

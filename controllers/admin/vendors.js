@@ -70,44 +70,53 @@ const deleteVendor = asyncHandler(async (req, res) => {
 
 const editVendor = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { businessName, serviceType, isActive, isBlocked, name, email, phone } = req.body;
+  const { businessName, serviceType, isActive, isBlocked, name, email, phone } =
+    req.body;
 
   // Check if vendor exists
-  const vendor = await prisma.vendor.findUnique({ 
+  const vendor = await prisma.vendor.findUnique({
     where: { id },
     include: {
-      user: true
-    }
+      user: true,
+    },
   });
-  
+
   if (!vendor) {
     res.status(404);
     throw new Error("Vendor not found");
   }
 
-  // Split name into first and last name
-  const [firstName, ...lastNameParts] = name.split(' ');
-  const lastName = lastNameParts.join(' ');
+  // Prepare update data for vendor
+  const vendorUpdateData = {};
+  if (businessName) vendorUpdateData.businessName = businessName;
+  if (serviceType) vendorUpdateData.serviceType = serviceType;
+  if (isActive !== undefined) {
+    vendorUpdateData.status = isActive ? "APPROVED" : "SUSPENDED";
+  }
+
+  // Prepare update data for user
+  const userUpdateData = {};
+  if (email) userUpdateData.email = email;
+  if (isBlocked !== undefined) userUpdateData.isBlocked = isBlocked;
+  if (phone) userUpdateData.phone = phone;
+
+  // Handle name if provided
+  if (name) {
+    const [firstName, ...lastNameParts] = name.split(" ");
+    const lastName = lastNameParts.join(" ");
+    userUpdateData.firstName = firstName;
+    userUpdateData.lastName = lastName;
+  }
 
   // Update vendor and user details
   const [updatedVendor, updatedUser] = await Promise.all([
     prisma.vendor.update({
       where: { id },
-      data: {
-        businessName,
-        serviceType,
-        status: isActive ? "APPROVED" : "SUSPENDED",
-      },
+      data: vendorUpdateData,
     }),
     prisma.user.update({
       where: { id: vendor.userId },
-      data: {
-        email,
-        firstName,
-        lastName,
-        phone,
-        isBlocked,
-      },
+      data: userUpdateData,
     }),
   ]);
 
@@ -165,9 +174,78 @@ const suspendVendor = asyncHandler(async (req, res) => {
 
 // View Vendor Listings
 const viewVendorListings = asyncHandler(async (req, res) => {
+  const {
+    _start = 0,
+    _end = 10,
+    _sort = "businessName",
+    _order = "ASC",
+    businessName_like,
+    serviceType_like,
+    status,
+  } = req.query;
+
+  const filters = {};
+
+  // Add filters if provided
+  if (businessName_like) {
+    filters.businessName = {
+      contains: businessName_like,
+    };
+  }
+
+  if (serviceType_like) {
+    filters.serviceType = {
+      contains: serviceType_like,
+    };
+  }
+
+  if (status) {
+    filters.status = status;
+  }
+
+  // Count total records
+  const total = await prisma.vendor.count({
+    where: filters,
+  });
+
+  // Check if _sort is a field that needs special handling
+  let orderByField;
+  if (_sort === "name") {
+    // Sort by user's first name
+    orderByField = {
+      user: { firstName: _order.toLowerCase() },
+    };
+  } else if (_sort === "email") {
+    // Sort by user's email
+    orderByField = {
+      user: { email: _order.toLowerCase() },
+    };
+  } else if (_sort === "createdAt") {
+    // Sort by user's createdAt
+    orderByField = {
+      user: { createdAt: _order.toLowerCase() },
+    };
+  } else {
+    // Sort by vendor fields
+    orderByField = {
+      [_sort]: _order.toLowerCase(),
+    };
+  }
+
+  // Get vendors with pagination
   const vendors = await prisma.vendor.findMany({
+    where: filters,
     include: {
-      user: { select: { email: true, firstName: true, lastName: true, phone: true } },
+      user: {
+        select: {
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          isBlocked: true,
+          createdAt: true,
+        },
+      },
       services: {
         select: {
           id: true,
@@ -178,6 +256,9 @@ const viewVendorListings = asyncHandler(async (req, res) => {
         },
       },
     },
+    orderBy: orderByField,
+    skip: Number(_start),
+    take: Number(_end) - Number(_start),
   });
 
   // Format response
@@ -190,10 +271,16 @@ const viewVendorListings = asyncHandler(async (req, res) => {
     phone: vendor.user.phone,
     serviceType: vendor.serviceType,
     status: vendor.status,
+    isActive: vendor.status === "APPROVED",
     rating: vendor.rating,
-    services: vendor.services,
+    serviceCount: vendor.services.length,
+    isBlocked: vendor.user.isBlocked,
+    createdAt: vendor.user.createdAt,
   }));
 
+  // Set headers for react-admin pagination
+  res.set("x-total-count", total.toString());
+  res.set("Access-Control-Expose-Headers", "x-total-count");
   res.status(200).json(vendorListings);
 });
 
