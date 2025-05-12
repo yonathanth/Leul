@@ -99,7 +99,7 @@ model Vendor {
   businessName     String
   description      String?
   serviceType      String
-    accountNumber    Int?
+    accountNumber    String?
 
   status           VendorStatus @default(PENDING_APPROVAL)
   rating           Float?     @default(0)

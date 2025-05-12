@@ -67,63 +67,37 @@ const createVendorSubaccount = async (vendorId) => {
       throw new Error(`Vendor with ID ${vendorId} not found`);
     }
 
-    // Define default bank codes and required account number lengths
-    const bankDetails = {
-      CBE: { code: "946", length: 13, testAccount: "1000474468444" }, // Commercial Bank of Ethiopia
-      DASHEN: { code: "945", length: 10, testAccount: "1000000000" }, // Dashen Bank
-      AWASH: { code: "942", length: 10, testAccount: "1000000000" }, // Awash Bank
-      ZEMEN: { code: "946", length: 10, testAccount: "1000000000" }, // Zemen Bank
-    };
+    // Commercial Bank of Ethiopia details
+    const CBE_BANK_CODE = "946"; // Correct CBE bank code
+    const REQUIRED_LENGTH = 13;
 
-    // Determine bank details from vendor's bank name or use Zemen Bank as default
-    let bankInfo = bankDetails.CBE; // Default to Zemen Bank
+    // Get account number and validate
+    const accountNumber = vendor.accountNumber?.toString() || "";
 
-    if (vendor.bankName) {
-      const bankNameUppercase = vendor.bankName.toUpperCase();
-
-      if (
-        bankNameUppercase.includes("CBE") ||
-        bankNameUppercase.includes("COMMERCIAL")
-      ) {
-        bankInfo = bankDetails.CBE;
-      } else if (bankNameUppercase.includes("DASHEN")) {
-        bankInfo = bankDetails.DASHEN;
-      } else if (bankNameUppercase.includes("AWASH")) {
-        bankInfo = bankDetails.AWASH;
-      } else if (bankNameUppercase.includes("ZEMEN")) {
-        bankInfo = bankDetails.ZEMEN;
-      }
-    }
-
-    // Validate or generate account number
-    let accountNumber = vendor.bankAccountNumber || bankInfo.testAccount;
-
-    // Ensure account number has correct length for the bank
-    if (accountNumber.length !== bankInfo.length) {
-      console.warn(
-        `Account number length doesn't match bank requirements. Using test account.`
+    // Validate account number
+    if (
+      !accountNumber ||
+      accountNumber.length !== REQUIRED_LENGTH ||
+      !/^\d+$/.test(accountNumber)
+    ) {
+      console.error("Invalid CBE account number for vendor", {
+        vendorId,
+        accountNumber,
+        expectedLength: REQUIRED_LENGTH,
+      });
+      throw new Error(
+        `Invalid CBE account number. Must be ${REQUIRED_LENGTH} digits.`
       );
-      accountNumber = bankInfo.testAccount;
-    }
-
-    // Ensure account number contains only digits
-    if (!/^\d+$/.test(accountNumber)) {
-      console.warn(
-        `Account number contains non-digit characters. Using test account.`
-      );
-      accountNumber = bankInfo.testAccount;
     }
 
     console.log(
-      `Using bank code: ${bankInfo.code}, account number: ${accountNumber}`
+      `Creating Chapa subaccount for vendor: ${vendor.businessName}, Account: ${accountNumber}`
     );
 
     const response = await chapa.post("/subaccount", {
       business_name: vendor.businessName,
-      account_name:
-        `${vendor.firstName || ""} ${vendor.lastName || ""}`.trim() ||
-        "Vendor Account",
-      bank_code: bankInfo.code,
+      account_name: vendor.businessName, // Use business name for account name
+      bank_code: CBE_BANK_CODE,
       account_number: accountNumber,
       split_type: "percentage",
       split_value: "0.9", // 90% as decimal string

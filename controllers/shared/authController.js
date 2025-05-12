@@ -76,14 +76,24 @@ const register = async (req, res) => {
       });
       profileId = client.id;
     } else if (role === "VENDOR") {
-      const vendor = await prisma.vendor.create({
-        data: {
-          userId: newUser.id,
-          businessName: businessName || "Unnamed Business",
-          serviceType: serviceType || "General",
-        },
-      });
-      profileId = vendor.id;
+      try {
+        console.log(
+          "Creating vendor with account number:",
+          req.body.accountNumber
+        );
+        const vendor = await prisma.vendor.create({
+          data: {
+            userId: newUser.id,
+            businessName: businessName || "Unnamed Business",
+            serviceType: serviceType || "General",
+            accountNumber: req.body.accountNumber || null,
+          },
+        });
+        profileId = vendor.id;
+      } catch (error) {
+        console.error("Error creating vendor:", error.message);
+        throw error;
+      }
     } else if (role === "EVENT_PLANNER") {
       const eventPlanner = await prisma.eventPlanner.create({
         data: {
