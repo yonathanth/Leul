@@ -83,13 +83,18 @@ const initiatePayment = asyncHandler(async (req, res) => {
       process.env.FRONTEND_URL || "https://weddingplanning-1-joi4.onrender.com";
     const backendBaseUrl = process.env.BACKEND_URL || "http://localhost:5000";
 
+    // Properly encode URL parameters to avoid HTML entity issues
+    const encodedTxRef = encodeURIComponent(tx_ref);
+    const encodedPaymentId = encodeURIComponent(payment.id);
+    const returnUrl = `${frontendBaseUrl}/dashboard/payment/status?tx_ref=${encodedTxRef}&payment_id=${encodedPaymentId}`;
+
     const response = await chapa.post("/transaction/initialize", {
       amount: amount.toString(),
       currency: "ETB",
       email: req.user.email,
       tx_ref,
       callback_url: `${backendBaseUrl}/api/client/payment/verify`,
-      return_url: `${frontendBaseUrl}/dashboard/payment/status?tx_ref=${tx_ref}&payment_id=${payment.id}`,
+      return_url: returnUrl,
       split: {
         type: "percentage",
         subaccounts: [
