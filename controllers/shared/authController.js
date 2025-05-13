@@ -25,6 +25,8 @@ const register = async (req, res) => {
       avatar,
       businessName, // For vendors
       serviceType, // For vendors
+      accountNumber, // For vendors
+      tinNumber, // For vendors - TIN number
       companyName, // For event planners
       bio,
     } = req.body;
@@ -42,6 +44,30 @@ const register = async (req, res) => {
         error:
           "Invalid role. Allowed roles are: ADMIN, EVENT_PLANNER, VENDOR, CLIENT",
       });
+    }
+
+    // Additional validations for vendor role
+    if (role === "VENDOR") {
+      if (!businessName) {
+        return res
+          .status(400)
+          .json({ error: "Business name is required for vendors." });
+      }
+      if (!serviceType) {
+        return res
+          .status(400)
+          .json({ error: "Service type is required for vendors." });
+      }
+      if (!accountNumber) {
+        return res
+          .status(400)
+          .json({ error: "Account number is required for vendors." });
+      }
+      if (!tinNumber) {
+        return res
+          .status(400)
+          .json({ error: "TIN number is required for vendors." });
+      }
     }
 
     // Check if email already exists
@@ -79,14 +105,17 @@ const register = async (req, res) => {
       try {
         console.log(
           "Creating vendor with account number:",
-          req.body.accountNumber
+          accountNumber,
+          "and TIN number:",
+          tinNumber
         );
         const vendor = await prisma.vendor.create({
           data: {
             userId: newUser.id,
             businessName: businessName || "Unnamed Business",
             serviceType: serviceType || "General",
-            accountNumber: req.body.accountNumber || null,
+            accountNumber: accountNumber || null,
+            tinNumber: tinNumber || null,
           },
         });
         profileId = vendor.id;

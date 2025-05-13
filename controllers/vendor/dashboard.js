@@ -19,6 +19,21 @@ const getDashboardOverview = asyncHandler(async (req, res) => {
   const vendorId = vendor.id;
   const serviceIds = vendor.services.map((service) => service.id);
 
+  // If vendor is not approved, return basic info with status
+  if (vendor.status !== "APPROVED") {
+    return res.status(200).json({
+      success: true,
+      data: {
+        vendorId,
+        businessName: vendor.businessName,
+        serviceType: vendor.serviceType,
+        status: vendor.status,
+        message:
+          "Your account is pending approval. You'll have access to full dashboard features once approved.",
+      },
+    });
+  }
+
   // Get all bookings for this vendor's services
   const bookingsData = await prisma.booking.findMany({
     where: {
@@ -131,6 +146,7 @@ const getDashboardOverview = asyncHandler(async (req, res) => {
       vendorId,
       businessName: vendor.businessName,
       serviceType: vendor.serviceType,
+      status: vendor.status,
       rating,
       totalBookings: bookingsData.length,
       pendingBookings: {

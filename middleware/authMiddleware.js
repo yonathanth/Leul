@@ -1,5 +1,6 @@
 const asyncHandler = require("express-async-handler");
 const jwt = require("jsonwebtoken");
+const prisma = require("../prisma/client");
 
 // General authentication middleware
 const authenticate = asyncHandler(async (req, res, next) => {
@@ -63,6 +64,48 @@ const checkRole = (allowedRoles) => {
             ", "
           )}`,
         });
+      }
+
+      // For vendors, verify their approval status
+      if (decoded.role === "VENDOR") {
+        try {
+          // Find the vendor in the database
+          const vendor = await prisma.vendor.findFirst({
+            where: { userId: decoded.userId },
+          });
+
+          if (!vendor) {
+            return res.status(404).json({
+              message: "Vendor profile not found",
+            });
+          }
+
+          // Check if the vendor is approved
+          if (vendor.status !== "APPROVED") {
+            // Allow access to account/profile routes for pending vendors
+            const isAccountRoute =
+              req.originalUrl.includes("/api/vendor/account") ||
+              req.originalUrl.includes("/api/vendor/dashboard");
+
+            if (isAccountRoute) {
+              // Attach vendor status to the request object
+              req.vendorStatus = vendor.status;
+              req.user = decoded;
+              return next();
+            }
+
+            return res.status(403).json({
+              message:
+                "Your vendor account is pending approval. You cannot access this resource until approved.",
+              status: vendor.status,
+            });
+          }
+        } catch (error) {
+          console.error("Error checking vendor status:", error);
+          return res.status(500).json({
+            message: "Error verifying vendor status",
+          });
+        }
       }
 
       // Attach user to request object
