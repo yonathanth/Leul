@@ -7,18 +7,20 @@ const browseServices = asyncHandler(async (req, res) => {
   const {
     category,
     search,
-    sortBy = "price", // Default to price
+    sortBy = "basePrice", // Changed from price to basePrice
     sortOrder = "asc", // Default to ascending
     page = 1,
     limit = 10,
   } = req.query;
 
   // Validate sort parameters
-  const validSortFields = ["price", "name", "createdAt"];
+  const validSortFields = ["basePrice", "name", "createdAt"]; // Updated from price to basePrice
   const validSortOrders = ["asc", "desc"];
   if (!validSortFields.includes(sortBy)) {
     res.status(400);
-    throw new Error("Invalid sortBy field. Must be price, name, or createdAt");
+    throw new Error(
+      "Invalid sortBy field. Must be basePrice, name, or createdAt"
+    );
   }
   if (!validSortOrders.includes(sortOrder)) {
     res.status(400);
@@ -59,6 +61,7 @@ const browseServices = asyncHandler(async (req, res) => {
           user: { select: { firstName: true, lastName: true } },
         },
       },
+      tiers: true, // Include service tiers
     },
     orderBy: { [sortBy]: sortOrder },
     skip: (pageNum - 1) * limitNum,
@@ -71,18 +74,25 @@ const browseServices = asyncHandler(async (req, res) => {
   // Format response
   const formattedServices = services.map((service) => ({
     id: service.id,
-    name: service.name,
-    description: service.description,
-    price: service.price,
-    category: service.category,
+    name: service.name || "",
+    description: service.description || "",
+    basePrice: service.basePrice || 0,
+    category: service.category || "",
+    tiers: service.tiers || [],
     createdAt: service.createdAt,
-    vendor: {
-      id: service.vendor.id,
-      userId: service.vendor.userId,
-      businessName: service.vendor.businessName,
-      rating: service.vendor.rating,
-      ownerName: `${service.vendor.user.firstName} ${service.vendor.user.lastName}`,
-    },
+    vendor: service.vendor
+      ? {
+          id: service.vendor.id,
+          userId: service.vendor.userId,
+          businessName: service.vendor.businessName || "",
+          rating: service.vendor.rating || 0,
+          ownerName: service.vendor.user
+            ? `${service.vendor.user.firstName || ""} ${
+                service.vendor.user.lastName || ""
+              }`.trim()
+            : "",
+        }
+      : null,
   }));
 
   res.status(200).json({

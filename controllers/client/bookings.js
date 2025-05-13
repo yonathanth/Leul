@@ -3,20 +3,39 @@ const prisma = require("../../prisma/client");
 
 // Book Event
 const bookEvent = asyncHandler(async (req, res) => {
-  const { serviceId, eventDate, location, attendees, specialRequests } =
-    req.body;
+  const {
+    serviceId,
+    serviceTierPriceId,
+    selectedTier,
+    eventDate,
+    location,
+    attendees,
+    specialRequests,
+  } = req.body;
+
   const userId = req.user.id; // Assumes user ID from auth middleware
 
   // Validate required fields
-  if (!serviceId || !eventDate || !location) {
+  if (
+    !serviceId ||
+    !eventDate ||
+    !location ||
+    !selectedTier ||
+    !serviceTierPriceId
+  ) {
     res.status(400);
-    throw new Error("Service ID, event date, and location are required");
+    throw new Error(
+      "Service ID, service tier, event date, and location are required"
+    );
   }
 
-  // Validate service exists and is from an approved vendor
+  // Validate service and tier exist and are from an approved vendor
   const service = await prisma.service.findUnique({
     where: { id: serviceId },
-    include: { vendor: true },
+    include: {
+      vendor: true,
+      tiers: true,
+    },
   });
 
   if (!service) {
@@ -27,6 +46,15 @@ const bookEvent = asyncHandler(async (req, res) => {
   if (service.vendor.status !== "APPROVED") {
     res.status(400);
     throw new Error("Service is not available from an approved vendor");
+  }
+
+  // Validate the selected tier exists
+  const selectedTierPrice = service.tiers.find(
+    (tier) => tier.id === serviceTierPriceId
+  );
+  if (!selectedTierPrice) {
+    res.status(404);
+    throw new Error("Selected service tier not found");
   }
 
   // Validate event date is in the future
@@ -53,6 +81,8 @@ const bookEvent = asyncHandler(async (req, res) => {
     data: {
       clientId: client.id,
       serviceId,
+      serviceTierPriceId,
+      selectedTier,
       eventDate: eventDateObj,
       location,
       attendees: attendees ? parseInt(attendees) : undefined,
@@ -63,11 +93,12 @@ const bookEvent = asyncHandler(async (req, res) => {
       service: {
         select: {
           name: true,
-          price: true,
+          basePrice: true,
           category: true,
           vendor: { select: { businessName: true, rating: true, id: true } },
         },
       },
+      serviceTierPrice: true,
     },
   });
 
@@ -85,8 +116,14 @@ const bookEvent = asyncHandler(async (req, res) => {
       service: {
         id: service.id,
         name: booking.service.name,
-        price: booking.service.price,
+        basePrice: booking.service.basePrice,
         category: booking.service.category,
+      },
+      tier: {
+        id: booking.serviceTierPrice.id,
+        tier: booking.serviceTierPrice.tier,
+        price: booking.serviceTierPrice.price,
+        description: booking.serviceTierPrice.description,
       },
       vendor: booking.service.vendor
         ? {
@@ -156,11 +193,12 @@ const viewBookings = asyncHandler(async (req, res) => {
       service: {
         select: {
           name: true,
-          price: true,
+          basePrice: true,
           category: true,
           vendor: { select: { businessName: true, rating: true } },
         },
       },
+      serviceTierPrice: true,
     },
     orderBy: { eventDate: type === "upcoming" ? "asc" : "desc" },
     skip: (pageNum - 1) * limitNum,
@@ -174,28 +212,30 @@ const viewBookings = asyncHandler(async (req, res) => {
   const formattedBookings = bookings.map((booking) => ({
     id: booking.id,
     eventDate: booking.eventDate,
-    location: booking.location,
-    status: booking.status,
-    attendees: booking.attendees,
-    specialRequests: booking.specialRequests,
-    service: {
-      id: booking.service.id,
-      name: booking.service.name,
-      price: booking.service.price,
-      category: booking.service.category,
-    },
-    vendor: booking.service.vendor
+    location: booking.location || "",
+    attendees: booking.attendees || 0,
+    status: booking.status || "PENDING",
+    specialRequests: booking.specialRequests || "",
+    createdAt: booking.createdAt,
+    service: booking.service
       ? {
-          businessName: booking.service.vendor.businessName,
-          rating: booking.service.vendor.rating,
+          name: booking.service.name || "",
+          basePrice: booking.service.basePrice || 0,
+          category: booking.service.category || "",
+        }
+      : null,
+    vendor: booking.service?.vendor || null,
+    tier: booking.serviceTierPrice
+      ? {
+          tier: booking.serviceTierPrice.tier,
+          price: booking.serviceTierPrice.price,
+          description: booking.serviceTierPrice.description || "",
         }
       : null,
   }));
 
   res.status(200).json({
-    message: `${
-      type === "upcoming" ? "Upcoming" : "Past"
-    } bookings retrieved successfully`,
+    message: "Bookings retrieved successfully",
     bookings: formattedBookings,
     pagination: {
       total: totalBookings,

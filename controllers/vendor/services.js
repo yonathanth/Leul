@@ -16,28 +16,44 @@ const addService = asyncHandler(async (req, res) => {
   const vendorId = vendor.id;
 
   // Extract service details from the request body
-  const { title, description, price, category } = req.body;
+  const { title, description, basePrice, category, tiers } = req.body;
 
   // Validate required fields
-  if (!title || !price || !category) {
+  if (!title || !basePrice || !category) {
     res.status(400);
-    throw new Error("Title, price, and category are required fields");
+    throw new Error("Title, base price, and category are required fields");
   }
 
-  // Validate price (must be a positive number)
-  if (typeof price !== "number" || price <= 0) {
+  // Validate base price (must be a positive number)
+  if (typeof basePrice !== "number" || basePrice <= 0) {
     res.status(400);
-    throw new Error("Price must be a positive number");
+    throw new Error("Base price must be a positive number");
   }
 
-  // Create the new service
+  // Validate that at least one tier is provided
+  if (!tiers || !Array.isArray(tiers) || tiers.length === 0) {
+    res.status(400);
+    throw new Error("At least one service tier must be provided");
+  }
+
+  // Create the new service with its tiers
   const newService = await prisma.service.create({
     data: {
       name: title,
       description: description || "",
-      price,
+      basePrice,
       category,
       vendorId,
+      tiers: {
+        create: tiers.map((tier) => ({
+          tier: tier.tier,
+          price: tier.price,
+          description: tier.description || "",
+        })),
+      },
+    },
+    include: {
+      tiers: true,
     },
   });
 
@@ -48,8 +64,9 @@ const addService = asyncHandler(async (req, res) => {
       serviceId: newService.id,
       title: newService.name,
       description: newService.description,
-      price: newService.price,
+      basePrice: newService.basePrice,
       category: newService.category,
+      tiers: newService.tiers,
       createdAt: newService.createdAt,
     },
   });
@@ -110,43 +127,82 @@ const updateService = asyncHandler(async (req, res) => {
   }
 
   const vendorId = vendor.id;
-  const { serviceId } = req.params;
 
-  // Check if the service exists and belongs to the vendor
-  const service = await prisma.service.findUnique({
-    where: { id: serviceId },
+  // Get serviceId from route parameters
+  const serviceId = req.params.serviceId;
+  if (!serviceId) {
+    res.status(400);
+    throw new Error("Service ID is required");
+  }
+
+  console.log("Updating service with ID:", serviceId);
+
+  // Check if the service exists and belongs to this vendor
+  const existingService = await prisma.service.findFirst({
+    where: {
+      id: serviceId,
+      vendorId: vendorId,
+    },
+    include: {
+      tiers: true,
+    },
   });
 
-  if (!service) {
+  if (!existingService) {
     res.status(404);
-    throw new Error("Service not found");
+    throw new Error(
+      "Service not found or you don't have permission to edit it"
+    );
   }
 
-  if (service.vendorId !== vendorId) {
-    res.status(403);
-    throw new Error("Not authorized to update this service");
-  }
+  // Extract update details from the request body
+  const { title, description, basePrice, category, tiers } = req.body;
 
-  // Extract fields to update from the request body
-  const { title, description, price, category } = req.body;
-
-  // Validate fields if provided
-  if (price && (typeof price !== "number" || price <= 0)) {
+  // Validate price if provided (must be a positive number)
+  if (
+    basePrice !== undefined &&
+    (typeof basePrice !== "number" || basePrice <= 0)
+  ) {
     res.status(400);
-    throw new Error("Price must be a positive number");
+    throw new Error("Base price must be a positive number");
   }
 
-  // Prepare the data to update
-  const updateData = {};
-  if (title) updateData.name = title;
-  if (description) updateData.description = description;
-  if (price) updateData.price = price;
-  if (category) updateData.category = category;
+  // Update service tiers if provided
+  if (tiers && Array.isArray(tiers)) {
+    // Delete existing tiers
+    await prisma.serviceTierPrice.deleteMany({
+      where: { serviceId },
+    });
+
+    // Create new tiers
+    await Promise.all(
+      tiers.map((tier) =>
+        prisma.serviceTierPrice.create({
+          data: {
+            serviceId,
+            tier: tier.tier,
+            price: tier.price,
+            description: tier.description || "",
+          },
+        })
+      )
+    );
+  }
 
   // Update the service
   const updatedService = await prisma.service.update({
     where: { id: serviceId },
-    data: updateData,
+    data: {
+      name: title !== undefined ? title : existingService.name,
+      description:
+        description !== undefined ? description : existingService.description,
+      basePrice:
+        basePrice !== undefined ? basePrice : existingService.basePrice,
+      category: category !== undefined ? category : existingService.category,
+    },
+    include: {
+      tiers: true,
+    },
   });
 
   // Respond with the updated service
@@ -156,8 +212,9 @@ const updateService = asyncHandler(async (req, res) => {
       serviceId: updatedService.id,
       title: updatedService.name,
       description: updatedService.description,
-      price: updatedService.price,
+      basePrice: updatedService.basePrice,
       category: updatedService.category,
+      tiers: updatedService.tiers,
       updatedAt: updatedService.updatedAt,
     },
   });
@@ -188,8 +245,8 @@ const getVendorServices = asyncHandler(async (req, res) => {
           serviceType: true,
         },
       },
+      tiers: true, // Include service tiers
       // Include other relations that exist in your Service model
-      // For example, if you have bookings:
       bookings: true,
     },
   });
@@ -199,8 +256,9 @@ const getVendorServices = asyncHandler(async (req, res) => {
     serviceId: service.id,
     title: service.name,
     description: service.description,
-    price: service.price,
+    basePrice: service.basePrice,
     category: service.category,
+    tiers: service.tiers,
     vendorInfo: {
       // Include vendor info in response
       businessName: service.vendor.businessName,

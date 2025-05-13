@@ -63,11 +63,12 @@ const getVendorBookings = asyncHandler(async (req, res) => {
         select: {
           id: true,
           name: true,
-          price: true,
+          basePrice: true,
           category: true,
           description: true,
         },
       },
+      serviceTierPrice: true,
       payments: {
         select: {
           id: true,
@@ -83,19 +84,60 @@ const getVendorBookings = asyncHandler(async (req, res) => {
     take: limitNum,
   });
 
-  // Get total count for pagination
+  // Count total bookings for pagination
   const totalBookings = await prisma.booking.count({
     where: queryFilter,
   });
 
+  // Format the response
+  const formattedBookings = bookings.map((booking) => ({
+    id: booking.id,
+    eventDate: booking.eventDate,
+    location: booking.location || "",
+    attendees: booking.attendees || 0,
+    specialRequests: booking.specialRequests || "",
+    status: booking.status || "PENDING",
+    createdAt: booking.createdAt,
+    service: booking.service
+      ? {
+          id: booking.service.id,
+          name: booking.service.name || "",
+          basePrice: booking.service.basePrice || 0,
+          category: booking.service.category || "",
+          description: booking.service.description || "",
+        }
+      : null,
+    tier: booking.serviceTierPrice
+      ? {
+          id: booking.serviceTierPrice.id,
+          tier: booking.serviceTierPrice.tier,
+          price: booking.serviceTierPrice.price || 0,
+          description: booking.serviceTierPrice.description || "",
+        }
+      : null,
+    client: booking.client
+      ? {
+          id: booking.client.id,
+          firstName: booking.client.user?.firstName || "",
+          lastName: booking.client.user?.lastName || "",
+          email: booking.client.user?.email || "",
+          phone: booking.client.user?.phone || "",
+          avatar: booking.client.user?.avatar || "",
+        }
+      : null,
+    payments: booking.payments || [],
+  }));
+
   res.status(200).json({
-    bookings,
+    success: true,
+    count: formattedBookings.length,
     pagination: {
       total: totalBookings,
       page: pageNum,
       limit: limitNum,
       totalPages: Math.ceil(totalBookings / limitNum),
     },
+    data: formattedBookings,
   });
 });
 
@@ -114,7 +156,7 @@ const getBookingById = asyncHandler(async (req, res) => {
     throw new Error("Vendor profile not found");
   }
 
-  // Get booking
+  // Get the booking, ensuring it belongs to this vendor
   const booking = await prisma.booking.findFirst({
     where: {
       id: bookingId,
@@ -142,11 +184,12 @@ const getBookingById = asyncHandler(async (req, res) => {
         select: {
           id: true,
           name: true,
-          price: true,
+          basePrice: true,
           category: true,
           description: true,
         },
       },
+      serviceTierPrice: true,
       payments: {
         select: {
           id: true,
@@ -164,7 +207,49 @@ const getBookingById = asyncHandler(async (req, res) => {
     throw new Error("Booking not found or doesn't belong to your services");
   }
 
-  res.status(200).json(booking);
+  // Format the response
+  const formattedBooking = {
+    id: booking.id,
+    eventDate: booking.eventDate,
+    location: booking.location || "",
+    attendees: booking.attendees || 0,
+    specialRequests: booking.specialRequests || "",
+    status: booking.status || "PENDING",
+    createdAt: booking.createdAt,
+    service: booking.service
+      ? {
+          id: booking.service.id,
+          name: booking.service.name || "",
+          basePrice: booking.service.basePrice || 0,
+          category: booking.service.category || "",
+          description: booking.service.description || "",
+        }
+      : null,
+    tier: booking.serviceTierPrice
+      ? {
+          id: booking.serviceTierPrice.id,
+          tier: booking.serviceTierPrice.tier,
+          price: booking.serviceTierPrice.price || 0,
+          description: booking.serviceTierPrice.description || "",
+        }
+      : null,
+    client: booking.client
+      ? {
+          id: booking.client.id,
+          firstName: booking.client.user?.firstName || "",
+          lastName: booking.client.user?.lastName || "",
+          email: booking.client.user?.email || "",
+          phone: booking.client.user?.phone || "",
+          avatar: booking.client.user?.avatar || "",
+        }
+      : null,
+    payments: booking.payments || [],
+  };
+
+  res.status(200).json({
+    success: true,
+    data: formattedBooking,
+  });
 });
 
 // Confirm a booking
